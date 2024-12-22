@@ -133,3 +133,30 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+
+.scrollBar{
+  margin: 0rem;
+  --sb-track-color: #252525;
+  --sb-thumb-color: #FB923C;
+  --sb-size: .7rem;
+}
+    
+.scrollBar::-webkit-scrollbar {
+  width: var(--sb-size)
+}
+    
+.scrollBar::-webkit-scrollbar-track {
+  background: var(--sb-track-color);
+}
+    
+.scrollBar::-webkit-scrollbar-thumb {
+  background: var(--sb-thumb-color);
+  border-radius: 10px;  
+}
+    
+@supports not selector(::-webkit-scrollbar) {
+  .scrollBar {
+    scrollbar-color: var(--sb-thumb-color)
+                      var(--sb-track-color);
+  }
+}

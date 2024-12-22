@@ -63,7 +63,7 @@ export default function HomePage() {
     <main className="min-h-screen flex flex-col items-center justify-center">
         <section className="splash-section-1">
           <DotPattern className={cn("[mask-image:radial-gradient(25rem_circle_at_center,white,transparent)]")}/>
-          <WordFadeIn className="splash-gradient mont font-extrabold" words="Welcome to Celeris!" delay={0.5} />
+          <WordFadeIn className="text-white mont font-extrabold" words="Welcome to Celeris!" delay={0.5} />
           <TypingAnimation 
             className="font-medium text-gray-300 text-lg mont" 
             text="Empowering Seamless File Transfers with Speed and Security" 
