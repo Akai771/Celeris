@@ -1,13 +1,22 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useWebRTC } from "@/hooks/useWebRTC";
 import Link from "next/link";
 import { ChevronLeft, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import BlurFade from "@/components/ui/blur-fade";
 import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from "@/components/ui/table";
 import { BorderBeam } from "@/components/ui/border-beam";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 
 export default function Recieve() {
@@ -15,17 +24,43 @@ export default function Recieve() {
   const [showModal, setShowModal] = useState(false);
   const [connectionId, setConnectionId] = useState("");
   const searchParams = useSearchParams();
+  const [isDialogOpen, setDialogOpen] = useState(false);
+  const { createConnection, closeConnection, setRemoteConnectionId } = useWebRTC("ws://localhost:8080");
 
   useEffect(() => {
-    const id = searchParams.get("id")
-    if (!id) {
-      setShowModal(true);
-    } else {
-      setConnectionId(id || "");
+    const id = searchParams.get("id");
+    if (id) {
+        setConnectionId(id);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (connectionId) {
+        setRemoteConnectionId(connectionId);
+        createConnection();
+        setDialogOpen(true); // Open dialog when connected
+    }
+  }, [connectionId, createConnection, setRemoteConnectionId]);
   
+  const handleDisconnect = () => {
+    closeConnection(); // Close the connection
+    setDialogOpen(false); // Close the dialog
+    router.push("/"); // Redirect back to the homepage
+  };
   
+  useEffect(() => {
+    let connectionCreated = false; // Prevent multiple connections
+    if (connectionId && !connectionCreated) {
+        setRemoteConnectionId(connectionId); // Set the connection ID for signaling
+        createConnection();
+        connectionCreated = true;
+    }
+
+    return () => {
+        // Cleanup any ongoing WebRTC or signaling processes
+        connectionCreated = false;
+    };
+  }, [connectionId, createConnection, setRemoteConnectionId]);
 
   const handleModalClose = () => {
     setShowModal(false);
@@ -117,6 +152,21 @@ export default function Recieve() {
           </div>
         </>
       )}
+      <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
+                <DialogContent className="bg-black">
+                    <DialogHeader>
+                        <DialogTitle>Client Connected</DialogTitle>
+                        <DialogDescription>
+                            A client has successfully connected. You can now transfer files or disconnect.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button onClick={handleDisconnect} variant="destructive">
+                            Disconnect
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+        </Dialog>
     </>
   );
 }
