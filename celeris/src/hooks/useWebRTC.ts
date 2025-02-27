@@ -1,417 +1,722 @@
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
-// Define types for file transfer
-interface FileMetadata {
-  name: string;
-  type: string;
-  size: number;
-}
-
-interface FileProgress {
-  receivedSize: number;
-  totalSize: number;
-  percentage: number;
-}
-
-export enum ConnectionState {
-  DISCONNECTED = "disconnected",
+// Define connection states for better status tracking
+enum ConnectionState {
+  NEW = "new",
   CONNECTING = "connecting",
   CONNECTED = "connected",
-  ERROR = "error"
+  DISCONNECTED = "disconnected",
+  FAILED = "failed"
 }
 
 export function useWebRTC(signalingUrl: string) {
-    const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.DISCONNECTED);
-    const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
-    const [remoteConnectionId, setRemoteConnectionId] = useState<string | null>(null);
-    const [transferProgress, setTransferProgress] = useState<FileProgress | null>(null);
-    const [receivedFiles, setReceivedFiles] = useState<File[]>([]);
-    const [error, setError] = useState<string | null>(null);
-    
-    const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-    const signalingRef = useRef<WebSocket | null>(null);
-    const receivedChunksRef = useRef<ArrayBuffer[]>([]);
-    const currentFileMetadataRef = useRef<FileMetadata | null>(null);
-    
-    // Cleanup function to reset state
-    const cleanup = useCallback(() => {
-        if (peerConnectionRef.current) {
-            peerConnectionRef.current.close();
-            peerConnectionRef.current = null;
-        }
-        
-        if (signalingRef.current && signalingRef.current.readyState === WebSocket.OPEN) {
-            signalingRef.current.close();
-            signalingRef.current = null;
-        }
-        
-        // Reset state
-        setConnectionState(ConnectionState.DISCONNECTED);
-        setDataChannel(null);
-        setTransferProgress(null);
-        receivedChunksRef.current = [];
-        currentFileMetadataRef.current = null;
-        setError(null);
-    }, []);
+  const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.NEW);
+  const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
+  const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [receivedFiles, setReceivedFiles] = useState<File[]>([]);
 
-    // Initialize the WebRTC connection
-    const createConnection = useCallback(async () => {
-        // Don't create a new connection if one already exists
-        if (connectionState === ConnectionState.CONNECTING || 
-            connectionState === ConnectionState.CONNECTED) {
-            console.warn("Connection already active or in progress");
-            return;
+  // Create refs to hold persistent values across renders
+  const peerConnection = useRef<RTCPeerConnection | null>(null);
+  const signalingConnection = useRef<WebSocket | null>(null);
+  const fileChunks = useRef<Uint8Array[]>([]);
+  const currentFileInfo = useRef<{ name: string, type: string, size: number } | null>(null);
+  const bytesReceived = useRef<number>(0);
+
+  // Clean up function to reset everything
+  const cleanupConnection = useCallback(() => {
+    console.log("Cleaning up WebRTC connection");
+    
+    // Close data channel
+    if (dataChannel) {
+      try {
+        console.log(`Closing data channel with state: ${dataChannel.readyState}`);
+        if (dataChannel.readyState === 'open' || dataChannel.readyState === 'connecting') {
+          dataChannel.close();
         }
+      } catch (err) {
+        console.error("Error closing data channel:", err);
+      }
+    }
+    
+    // Close peer connection
+    if (peerConnection.current) {
+      try {
+        console.log(`Closing peer connection with state: ${peerConnection.current.connectionState}`);
+        // Remove all event listeners to prevent memory leaks
+        peerConnection.current.onicecandidate = null;
+        peerConnection.current.oniceconnectionstatechange = null;
+        peerConnection.current.onicegatheringstatechange = null;
+        peerConnection.current.onconnectionstatechange = null;
+        peerConnection.current.onnegotiationneeded = null;
+        peerConnection.current.ondatachannel = null;
         
-        try {
-            setConnectionState(ConnectionState.CONNECTING);
-            
-            // Create WebSocket connection for signaling
-            const ws = new WebSocket(signalingUrl);
-            signalingRef.current = ws;
-            
-            // Create RTCPeerConnection
-            const configuration = {
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' }
-                ]
-            };
-            
-            const peerConnection = new RTCPeerConnection(configuration);
-            peerConnectionRef.current = peerConnection;
-            
-            // Create data channel for file transfer
-            const channel = peerConnection.createDataChannel("fileTransfer", {
-                ordered: true,
-                maxRetransmits: 30
-            });
-            
-            // Configure the data channel
-            channel.binaryType = "arraybuffer";
-            channel.bufferedAmountLowThreshold = 65535; // 64 KB
-            
-            // Set up event handlers for the data channel
-            channel.onopen = () => {
-                console.log("Data channel opened");
-                setConnectionState(ConnectionState.CONNECTED);
-                setDataChannel(channel);
-            };
-            
-            channel.onclose = () => {
-                console.log("Data channel closed");
+        // Close the connection
+        peerConnection.current.close();
+      } catch (err) {
+        console.error("Error closing peer connection:", err);
+      } finally {
+        peerConnection.current = null;
+      }
+    }
+    
+    // Close signaling connection
+    if (signalingConnection.current) {
+      try {
+        console.log(`Closing signaling connection with state: ${signalingConnection.current.readyState}`);
+        if (signalingConnection.current.readyState === WebSocket.OPEN || 
+            signalingConnection.current.readyState === WebSocket.CONNECTING) {
+          // Remove event listeners
+          signalingConnection.current.onopen = null;
+          signalingConnection.current.onclose = null;
+          signalingConnection.current.onerror = null;
+          signalingConnection.current.onmessage = null;
+          
+          // Close the connection
+          signalingConnection.current.close();
+        }
+      } catch (err) {
+        console.error("Error closing signaling connection:", err);
+      } finally {
+        signalingConnection.current = null;
+      }
+    }
+    
+    // Reset state
+    setDataChannel(null);
+    setConnectionState(ConnectionState.DISCONNECTED);
+    fileChunks.current = [];
+    currentFileInfo.current = null;
+    bytesReceived.current = 0;
+    
+    console.log("Connection cleanup complete");
+  }, [dataChannel]);
+
+  // Initialize WebRTC peer connection
+  const initPeerConnection = useCallback(() => {
+    try {
+      console.log("Initializing WebRTC peer connection");
+      
+      // Configure ICE servers for better connectivity
+      const configuration = {
+        iceServers: [
+          // Use multiple STUN servers to improve connectivity chances
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' }
+        ],
+        // These options help improve connection robustness
+        iceCandidatePoolSize: 10,
+        bundlePolicy: 'max-bundle',
+        rtcpMuxPolicy: 'require'
+      };
+
+      const pc = new RTCPeerConnection(configuration);
+      peerConnection.current = pc;
+      
+      // Log negotiation needed events
+      pc.onnegotiationneeded = () => {
+        console.log("Negotiation needed event fired");
+      };
+
+      // Handle ICE candidate events
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          console.log("ICE candidate generated:", event.candidate.candidate ? event.candidate.candidate.substr(0, 50) + '...' : 'empty');
+          
+          if (signalingConnection.current?.readyState === WebSocket.OPEN) {
+            try {
+              signalingConnection.current.send(JSON.stringify({
+                type: 'candidate',
+                candidate: event.candidate,
+                connectionId: connectionId
+              }));
+              console.log("ICE candidate sent to signaling server");
+            } catch (err) {
+              console.error('Error sending ICE candidate:', err);
+              setError('Failed to send ICE candidate');
+            }
+          } else {
+            console.warn('Signaling connection not open, cannot send ICE candidate');
+          }
+        } else {
+          console.log("ICE candidate gathering complete");
+        }
+      };
+      
+      // Track ICE gathering state
+      pc.onicegatheringstatechange = () => {
+        console.log('ICE gathering state:', pc.iceGatheringState);
+      };
+
+      // Track connection state changes
+      pc.oniceconnectionstatechange = () => {
+        console.log('ICE connection state changed to:', pc.iceConnectionState);
+        
+        switch (pc.iceConnectionState) {
+          case 'checking':
+            console.log("ICE checking - connection attempt in progress");
+            // Don't change connection state here, wait for success or failure
+            break;
+          case 'connected':
+          case 'completed':
+            console.log("ICE connected/completed - connection established");
+            setConnectionState(ConnectionState.CONNECTED);
+            break;
+          case 'failed':
+            console.log("ICE failed - connection attempt failed");
+            setConnectionState(ConnectionState.FAILED);
+            setError('Connection failed - please check your connection and try again');
+            break;
+          case 'disconnected':
+            console.log("ICE disconnected - connection may recover automatically");
+            // Don't change state to DISCONNECTED yet, as it might recover
+            // Instead, set a timeout to change state if it doesn't recover
+            const disconnectTimeout = setTimeout(() => {
+              if (pc.iceConnectionState === 'disconnected') {
+                console.log("ICE still disconnected after timeout, marking as DISCONNECTED");
                 setConnectionState(ConnectionState.DISCONNECTED);
-                setDataChannel(null);
-            };
+              }
+            }, 5000); // 5 second recovery window
             
-            channel.onerror = (error) => {
-                console.error("Data channel error:", error);
-                setError(`Data channel error: ${error}`);
-                setConnectionState(ConnectionState.ERROR);
-            };
-            
-            // Handle receiving data
-            channel.onmessage = (event) => {
-                // Check if it's file metadata (JSON) or binary data
-                if (typeof event.data === 'string') {
-                    try {
-                        const metadata = JSON.parse(event.data) as FileMetadata;
-                        console.log("Received file metadata:", metadata);
-                        
-                        // Store the metadata for the file being received
-                        currentFileMetadataRef.current = metadata;
-                        
-                        // Initialize progress and received chunks
-                        setTransferProgress({
-                            receivedSize: 0,
-                            totalSize: metadata.size,
-                            percentage: 0
-                        });
-                        
-                        receivedChunksRef.current = [];
-                    } catch (error) {
-                        console.error("Error parsing file metadata:", error);
-                    }
-                } else if (event.data instanceof ArrayBuffer) {
-                    // Handle received file chunk
-                    if (currentFileMetadataRef.current) {
-                        // Add the chunk to our collection
-                        receivedChunksRef.current.push(event.data);
-                        
-                        // Update progress
-                        const receivedSize = receivedChunksRef.current.reduce(
-                            (total, chunk) => total + chunk.byteLength, 
-                            0
-                        );
-                        
-                        const totalSize = currentFileMetadataRef.current.size;
-                        const percentage = Math.min(
-                            Math.round((receivedSize / totalSize) * 100),
-                            100
-                        );
-                        
-                        setTransferProgress({
-                            receivedSize,
-                            totalSize,
-                            percentage
-                        });
-                        
-                        // Check if transfer is complete
-                        if (receivedSize >= totalSize) {
-                            // All chunks received, reconstruct the file
-                            const completeBuffer = new Uint8Array(totalSize);
-                            let offset = 0;
-                            
-                            for (const chunk of receivedChunksRef.current) {
-                                completeBuffer.set(new Uint8Array(chunk), offset);
-                                offset += chunk.byteLength;
-                            }
-                            
-                            // Create a Blob and then a File from the buffer
-                            const blob = new Blob([completeBuffer], {
-                                type: currentFileMetadataRef.current.type || 'application/octet-stream'
-                            });
-                            
-                            const file = new File(
-                                [blob],
-                                currentFileMetadataRef.current.name || 'received-file',
-                                {
-                                    type: currentFileMetadataRef.current.type || 'application/octet-stream'
-                                }
-                            );
-                            
-                            // Add the file to the received files list
-                            setReceivedFiles(prev => [...prev, file]);
-                            
-                            // Reset state for next file
-                            receivedChunksRef.current = [];
-                            currentFileMetadataRef.current = null;
-                            setTransferProgress(null);
-                        }
-                    } else {
-                        console.error("Received file chunk with no metadata");
-                    }
-                }
-            };
-            
-            // Set up WebSocket event handlers for signaling
-            ws.onopen = () => {
-                console.log("Signaling WebSocket connected");
-            };
-            
-            ws.onclose = () => {
-                console.log("Signaling WebSocket closed");
-                if (connectionState !== ConnectionState.CONNECTED) {
-                    // Only set to disconnected if we're not already connected via WebRTC
-                    // (WebRTC can continue working after signaling is done)
-                    setConnectionState(ConnectionState.DISCONNECTED);
-                    setError("Signaling server connection closed");
-                }
-            };
-            
-            ws.onerror = (event) => {
-                console.error("Signaling WebSocket error:", event);
-                setError("Signaling server connection error");
-                setConnectionState(ConnectionState.ERROR);
-            };
-            
-            // Handle signaling messages
-            ws.onmessage = async (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    
-                    // Only process messages for our connection ID
-                    if (data.connectionId && data.connectionId !== remoteConnectionId) {
-                        return;
-                    }
-                    
-                    if (data.type === "offer") {
-                        console.log("Received offer");
-                        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-                        const answer = await peerConnection.createAnswer();
-                        await peerConnection.setLocalDescription(answer);
-                        
-                        ws.send(JSON.stringify({
-                            type: "answer",
-                            answer,
-                            connectionId: remoteConnectionId
-                        }));
-                    } else if (data.type === "answer") {
-                        console.log("Received answer");
-                        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-                    } else if (data.type === "candidate") {
-                        console.log("Received ICE candidate");
-                        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-                    }
-                } catch (error) {
-                    console.error("Error processing signaling message:", error);
-                    setError(`Signaling error: ${error.message}`);
-                }
-            };
-            
-            // ICE candidate handling
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        type: "candidate",
-                        candidate: event.candidate,
-                        connectionId: remoteConnectionId
-                    }));
-                }
-            };
-            
-            peerConnection.oniceconnectionstatechange = () => {
-                console.log("ICE connection state:", peerConnection.iceConnectionState);
-                
-                switch (peerConnection.iceConnectionState) {
-                    case "connected":
-                    case "completed":
-                        setConnectionState(ConnectionState.CONNECTED);
-                        break;
-                    case "failed":
-                    case "disconnected":
-                    case "closed":
-                        setConnectionState(ConnectionState.DISCONNECTED);
-                        break;
-                }
-            };
-            
-            // Create and send offer if we're the initiating side
-            if (remoteConnectionId) {
-                const offer = await peerConnection.createOffer();
-                await peerConnection.setLocalDescription(offer);
-                
-                if (ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        type: "offer",
-                        offer,
-                        connectionId: remoteConnectionId
-                    }));
-                }
-            }
-            
-            // Set data channel for access outside
-            setDataChannel(channel);
-            
-        } catch (error) {
-            console.error("Error creating WebRTC connection:", error);
-            setError(`Connection error: ${error.message}`);
-            setConnectionState(ConnectionState.ERROR);
-            cleanup();
+            // Clear the timeout if component unmounts
+            return () => clearTimeout(disconnectTimeout);
+          case 'closed':
+            console.log("ICE closed - connection terminated");
+            setConnectionState(ConnectionState.DISCONNECTED);
+            break;
+          default:
+            console.log(`Unhandled ICE connection state: ${pc.iceConnectionState}`);
+            break;
         }
-    }, [connectionState, remoteConnectionId, signalingUrl, cleanup]);
-    
-    // Close the connection
-    const closeConnection = useCallback(() => {
-        cleanup();
-    }, [cleanup]);
-    
-    // Send a file over the data channel
-    const sendFile = useCallback(async (file: File) => {
-        if (!dataChannel || dataChannel.readyState !== "open") {
-            throw new Error("Data channel is not open");
+      };
+      
+      // Track connection state (newer API)
+      pc.onconnectionstatechange = () => {
+        console.log('Connection state changed to:', pc.connectionState);
+        
+        switch (pc.connectionState) {
+          case 'connected':
+            console.log("Connection established");
+            setConnectionState(ConnectionState.CONNECTED);
+            break;
+          case 'failed':
+            console.log("Connection failed");
+            setConnectionState(ConnectionState.FAILED);
+            setError('Connection failed - please check your connection and try again');
+            break;
+          case 'closed':
+            console.log("Connection closed");
+            setConnectionState(ConnectionState.DISCONNECTED);
+            break;
         }
-        
-        // First send metadata
-        const metadata: FileMetadata = {
-            name: file.name,
-            type: file.type,
-            size: file.size
-        };
-        
-        // Send metadata as JSON
-        dataChannel.send(JSON.stringify(metadata));
-        
-        // Initialize progress
-        setTransferProgress({
-            receivedSize: 0,
-            totalSize: file.size,
-            percentage: 0
-        });
-        
-        // Read and send the file in chunks
-        const chunkSize = 64 * 1024; // 64 KB chunks
-        let offset = 0;
-        
-        const reader = new FileReader();
-        
-        // This will read a chunk of the file and send it
-        const readNextChunk = () => {
-            const slice = file.slice(offset, offset + chunkSize);
-            reader.readAsArrayBuffer(slice);
-        };
-        
-        // When a chunk is loaded, send it
-        reader.onload = (e) => {
-            if (e.target?.result instanceof ArrayBuffer) {
-                dataChannel.send(e.target.result);
-                
-                // Update progress
-                offset += e.target.result.byteLength;
-                const percentage = Math.min(
-                    Math.round((offset / file.size) * 100),
-                    100
-                );
-                
-                setTransferProgress({
-                    receivedSize: offset,
-                    totalSize: file.size,
-                    percentage
-                });
-                
-                // Continue if there's more to send
-                if (offset < file.size) {
-                    // Check if the buffer is getting full
-                    if (dataChannel.bufferedAmount > dataChannel.bufferedAmountLowThreshold) {
-                        // Wait for buffer to drain before continuing
-                        const onBufferedAmountLow = () => {
-                            dataChannel.removeEventListener('bufferedamountlow', onBufferedAmountLow);
-                            readNextChunk();
-                        };
-                        
-                        dataChannel.addEventListener('bufferedamountlow', onBufferedAmountLow);
-                    } else {
-                        // Buffer is not full, continue immediately
-                        readNextChunk();
-                    }
-                } else {
-                    // Transfer complete
-                    console.log("File transfer complete");
-                    
-                    // Reset progress after a short delay
-                    setTimeout(() => {
-                        setTransferProgress(null);
-                    }, 1000);
-                }
-            }
-        };
-        
-        reader.onerror = (error) => {
-            console.error("Error reading file:", error);
-            setError(`Error reading file: ${error}`);
-            setTransferProgress(null);
-        };
-        
-        // Start the process
-        readNextChunk();
-    }, [dataChannel]);
-    
-    // Clean up on unmount
-    useEffect(() => {
-        return () => {
-            cleanup();
-        };
-    }, [cleanup]);
-    
-    return {
-        connectionState,
-        createConnection,
-        closeConnection,
-        dataChannel,
-        setRemoteConnectionId,
-        sendFile,
-        transferProgress,
-        receivedFiles,
-        error
+      };
+
+      // Handle data channels that are created by the remote peer
+      pc.ondatachannel = (event) => {
+        console.log("Data channel received from remote peer:", event.channel.label);
+        const channel = event.channel;
+        setupDataChannel(channel);
+      };
+
+      console.log("Peer connection initialized successfully");
+      return pc;
+    } catch (err) {
+      console.error('Error creating peer connection:', err);
+      setError(`Failed to create peer connection: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      return null;
+    }
+  }, [connectionId]);
+
+  // Set up and configure the data channel
+  const setupDataChannel = useCallback((channel: RTCDataChannel) => {
+    channel.binaryType = 'arraybuffer';
+
+    channel.onopen = () => {
+      console.log('Data channel is open');
+      setConnectionState(ConnectionState.CONNECTED);
+      setDataChannel(channel);
     };
+
+    channel.onclose = () => {
+      console.log('Data channel closed');
+      setConnectionState(ConnectionState.DISCONNECTED);
+      setDataChannel(null);
+    };
+
+    channel.onerror = (event) => {
+      console.error('Data channel error:', event);
+      setError('Data channel error occurred');
+    };
+
+    // Handle incoming file data
+    channel.onmessage = (event) => {
+      const data = event.data;
+      
+      // If data is a string, it's file metadata
+      if (typeof data === 'string') {
+        try {
+          const fileInfo = JSON.parse(data);
+          if (fileInfo.type === 'file-info') {
+            // Store file info for later use
+            currentFileInfo.current = {
+              name: fileInfo.name,
+              type: fileInfo.mimeType,
+              size: fileInfo.size
+            };
+            
+            // Reset for new file
+            fileChunks.current = [];
+            bytesReceived.current = 0;
+            
+            console.log(`Receiving file: ${fileInfo.name}, size: ${fileInfo.size} bytes`);
+          } else if (fileInfo.type === 'file-complete') {
+            // File transfer complete, reconstruct the file
+            finalizeFileTransfer();
+          }
+        } catch (err) {
+          console.error('Error processing file metadata:', err);
+        }
+      } 
+      // If data is binary, it's file content
+      else if (data instanceof ArrayBuffer) {
+        // Store the chunk
+        fileChunks.current.push(new Uint8Array(data));
+        bytesReceived.current += data.byteLength;
+        
+        // Log progress for large files
+        if (currentFileInfo.current && currentFileInfo.current.size > 1000000) {
+          const progress = Math.round((bytesReceived.current / currentFileInfo.current.size) * 100);
+          if (progress % 10 === 0) {
+            console.log(`File transfer progress: ${progress}%`);
+          }
+        }
+      }
+    };
+
+    return channel;
+  }, []);
+
+  // Reconstruct and save the received file
+  const finalizeFileTransfer = useCallback(() => {
+    if (!currentFileInfo.current || fileChunks.current.length === 0) {
+      console.error('No file data to finalize');
+      return;
+    }
+
+    try {
+      // Calculate total size and create a buffer
+      const totalSize = fileChunks.current.reduce((total, chunk) => total + chunk.length, 0);
+      const fileBuffer = new Uint8Array(totalSize);
+      
+      // Copy all chunks into the file buffer
+      let offset = 0;
+      for (const chunk of fileChunks.current) {
+        fileBuffer.set(chunk, offset);
+        offset += chunk.length;
+      }
+      
+      // Create file from buffer
+      const file = new File(
+        [fileBuffer.buffer], 
+        currentFileInfo.current.name, 
+        { type: currentFileInfo.current.type }
+      );
+      
+      console.log(`File received: ${file.name}, size: ${file.size} bytes`);
+      
+      // Add to received files list
+      setReceivedFiles(prev => [...prev, file]);
+      
+      // Reset for next file
+      fileChunks.current = [];
+      currentFileInfo.current = null;
+      bytesReceived.current = 0;
+    } catch (err) {
+      console.error('Error finalizing file transfer:', err);
+      setError('Failed to reconstruct received file');
+    }
+  }, []);
+
+  // Connect to the signaling server
+  const connectToSignalingServer = useCallback(() => {
+    try {
+      console.log(`Connecting to signaling server at ${signalingUrl} with ID: ${connectionId}`);
+      
+      // Close existing connection if any
+      if (signalingConnection.current && signalingConnection.current.readyState === WebSocket.OPEN) {
+        console.log('Closing existing signaling connection');
+        signalingConnection.current.close();
+      }
+      
+      const ws = new WebSocket(signalingUrl);
+      signalingConnection.current = ws;
+
+      ws.onopen = () => {
+        console.log('Connected to signaling server');
+        setConnectionState(ConnectionState.CONNECTING);
+        
+        // If we already have a connection ID, send a join message
+        if (connectionId) {
+          console.log(`Sending join message for ID: ${connectionId}`);
+          try {
+            ws.send(JSON.stringify({
+              type: 'join',
+              connectionId: connectionId
+            }));
+          } catch (err) {
+            console.error('Error sending join message:', err);
+          }
+        }
+      };
+
+      ws.onclose = () => {
+        console.log('Disconnected from signaling server');
+        if (connectionState !== ConnectionState.CONNECTED) {
+          setConnectionState(ConnectionState.DISCONNECTED);
+        }
+      };
+
+      ws.onerror = (event) => {
+        console.error('Signaling server error:', event);
+        setError('Failed to connect to signaling server');
+        setConnectionState(ConnectionState.FAILED);
+      };
+
+      ws.onmessage = async (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          
+          console.log('Received message type:', message.type, 
+                      message.connectionId ? `for connection: ${message.connectionId}` : '');
+          
+          // Process welcome message from server
+          if (message.type === 'welcome') {
+            console.log('Received welcome message from server, client ID:', message.clientId);
+            return;
+          }
+          
+          // Only process messages for our connection ID
+          if (message.connectionId && message.connectionId !== connectionId && 
+              connectionId !== null) {
+            console.log(`Ignoring message for different connection ID: ${message.connectionId}`);
+            return;
+          }
+
+          if (message.type === 'joined' || message.type === 'registered') {
+            console.log(`Connection ${message.type} with ID: ${message.connectionId}`);
+            return;
+          }
+
+          if (message.type === 'offer' && peerConnection.current) {
+            console.log('Processing offer');
+            
+            try {
+              await peerConnection.current.setRemoteDescription(new RTCSessionDescription(message.offer));
+              const answer = await peerConnection.current.createAnswer();
+              await peerConnection.current.setLocalDescription(answer);
+              
+              console.log('Created answer, sending to peer');
+              ws.send(JSON.stringify({
+                type: 'answer',
+                answer: answer,
+                connectionId: connectionId
+              }));
+            } catch (err) {
+              console.error('Error processing offer:', err);
+              setError(`Error processing offer: ${err.message}`);
+            }
+          }
+          else if (message.type === 'answer' && peerConnection.current) {
+            console.log('Processing answer');
+            try {
+              await peerConnection.current.setRemoteDescription(new RTCSessionDescription(message.answer));
+              console.log('Set remote description from answer');
+            } catch (err) {
+              console.error('Error setting remote description from answer:', err);
+              setError(`Error processing answer: ${err.message}`);
+            }
+          }
+          else if (message.type === 'candidate' && peerConnection.current) {
+            console.log('Adding ICE candidate');
+            try {
+              if (message.candidate) {
+                await peerConnection.current.addIceCandidate(new RTCIceCandidate(message.candidate));
+                console.log('Added ICE candidate');
+              } else {
+                console.warn('Received empty ICE candidate');
+              }
+            } catch (err) {
+              console.error('Error adding ICE candidate:', err);
+              // Don't set error state for ICE candidate issues as they can be non-fatal
+            }
+          }
+          else if (message.type === 'error') {
+            console.error('Received error from signaling server:', message.message);
+            setError(`Server error: ${message.message}`);
+          }
+        } catch (err) {
+          console.error('Error handling signaling message:', err);
+          console.error('Raw message:', typeof event.data === 'string' ? event.data.substring(0, 100) : 'non-string data');
+          setError(`Error processing signaling message: ${err.message}`);
+        }
+      };
+
+      return ws;
+    } catch (err) {
+      console.error('Error connecting to signaling server:', err);
+      setError(`Failed to connect to signaling server: ${err.message}`);
+      return null;
+    }
+  }, [connectionId, connectionState]);
+
+  // Create a connection as initiator (sender)
+  const createConnection = useCallback(async () => {
+    try {
+      if (!connectionId) {
+        console.error("Cannot create connection without connectionId");
+        setError("Connection ID is required");
+        return false;
+      }
+      
+      console.log(`Creating connection as initiator with ID: ${connectionId}`);
+      setConnectionState(ConnectionState.CONNECTING);
+      setError(null);
+      
+      // Ensure any existing connections are closed
+      cleanupConnection();
+      
+      // Initialize WebSocket
+      const ws = connectToSignalingServer();
+      if (!ws) {
+        throw new Error('Failed to connect to signaling server');
+      }
+      
+      // We need to wait for the WebSocket to be ready before continuing
+      await new Promise<void>((resolve, reject) => {
+        const checkReady = () => {
+          if (signalingConnection.current?.readyState === WebSocket.OPEN) {
+            resolve();
+          } else if (signalingConnection.current?.readyState === WebSocket.CLOSED || 
+                    signalingConnection.current?.readyState === WebSocket.CLOSING) {
+            reject(new Error('Signaling connection closed'));
+          } else {
+            // Check again in 100ms
+            setTimeout(checkReady, 100);
+          }
+        };
+        
+        // Start checking
+        checkReady();
+        
+        // Set a timeout
+        setTimeout(() => reject(new Error('Timed out waiting for signaling connection')), 5000);
+      });
+      
+      console.log("Signaling connection established, initializing peer connection");
+      
+      // Initialize RTCPeerConnection
+      const pc = initPeerConnection();
+      if (!pc) {
+        throw new Error('Failed to initialize peer connection');
+      }
+      
+      // Register with the signaling server
+      console.log("Sending register message");
+      signalingConnection.current?.send(JSON.stringify({
+        type: 'register',
+        connectionId: connectionId
+      }));
+
+      // Create data channel
+      console.log("Creating data channel");
+      const channel = pc.createDataChannel('fileTransfer', {
+        ordered: true
+      });
+      
+      setupDataChannel(channel);
+      
+      // Create and send offer
+      console.log("Creating offer");
+      const offer = await pc.createOffer();
+      console.log("Setting local description");
+      await pc.setLocalDescription(offer);
+      
+      console.log("Sending offer to signaling server");
+      signalingConnection.current?.send(JSON.stringify({
+        type: 'offer',
+        offer: offer,
+        connectionId: connectionId
+      }));
+      
+      console.log("Connection setup complete");
+      return true;
+    } catch (err) {
+      console.error('Error creating connection:', err);
+      setError(`Failed to create connection: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setConnectionState(ConnectionState.FAILED);
+      cleanupConnection();
+      return false;
+    }
+  }, [cleanupConnection, connectToSignalingServer, connectionId, initPeerConnection, setupDataChannel]);
+
+  // Join an existing connection (receiver)
+  const joinConnection = useCallback(async () => {
+    try {
+      if (!connectionId) {
+        console.error("Cannot join connection without connectionId");
+        setError('Connection ID is required to join a connection');
+        return false;
+      }
+      
+      console.log(`Joining connection as receiver with ID: ${connectionId}`);
+      setConnectionState(ConnectionState.CONNECTING);
+      setError(null);
+      
+      // Ensure any existing connections are closed
+      cleanupConnection();
+      
+      // Initialize WebSocket
+      const ws = connectToSignalingServer();
+      if (!ws) {
+        throw new Error('Failed to connect to signaling server');
+      }
+      
+      // We need to wait for the WebSocket to be ready before continuing
+      await new Promise<void>((resolve, reject) => {
+        const checkReady = () => {
+          if (signalingConnection.current?.readyState === WebSocket.OPEN) {
+            resolve();
+          } else if (signalingConnection.current?.readyState === WebSocket.CLOSED || 
+                    signalingConnection.current?.readyState === WebSocket.CLOSING) {
+            reject(new Error('Signaling connection closed'));
+          } else {
+            // Check again in 100ms
+            setTimeout(checkReady, 100);
+          }
+        };
+        
+        // Start checking
+        checkReady();
+        
+        // Set a timeout
+        setTimeout(() => reject(new Error('Timed out waiting for signaling connection')), 5000);
+      });
+      
+      console.log("Signaling connection established, initializing peer connection");
+      
+      // Initialize RTCPeerConnection
+      const pc = initPeerConnection();
+      if (!pc) {
+        throw new Error('Failed to initialize peer connection');
+      }
+      
+      // Send join message to signaling server
+      console.log("Sending join message to signaling server");
+      signalingConnection.current?.send(JSON.stringify({
+        type: 'join',
+        connectionId: connectionId
+      }));
+      
+      console.log("Join connection setup complete, waiting for offer");
+      return true;
+    } catch (err) {
+      console.error('Error joining connection:', err);
+      setError(`Failed to join connection: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setConnectionState(ConnectionState.FAILED);
+      cleanupConnection();
+      return false;
+    }
+  }, [cleanupConnection, connectToSignalingServer, connectionId, initPeerConnection]);
+
+  // Send a file
+  const sendFile = useCallback((file: File) => {
+    if (!dataChannel || dataChannel.readyState !== 'open') {
+      setError('Data channel is not open');
+      return false;
+    }
+
+    try {
+      // Send file metadata first
+      const fileInfo = {
+        type: 'file-info',
+        name: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        size: file.size
+      };
+      
+      dataChannel.send(JSON.stringify(fileInfo));
+      console.log(`Sending file: ${file.name}, size: ${file.size} bytes`);
+      
+      // Read and send file in chunks
+      const chunkSize = 16 * 1024; // 16 KB chunks
+      let offset = 0;
+      
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        if (e.target && e.target.result && dataChannel.readyState === 'open') {
+          dataChannel.send(e.target.result as ArrayBuffer);
+          
+          offset += chunkSize;
+          
+          if (offset < file.size) {
+            // Read the next chunk
+            readChunk();
+          } else {
+            // Signal completion
+            dataChannel.send(JSON.stringify({ type: 'file-complete' }));
+            console.log('File sent successfully');
+          }
+        }
+      };
+      
+      reader.onerror = (e) => {
+        console.error('Error reading file:', e);
+        setError('Error reading file');
+      };
+      
+      // Function to read chunks
+      const readChunk = () => {
+        const slice = file.slice(offset, offset + chunkSize);
+        reader.readAsArrayBuffer(slice);
+      };
+      
+      // Start reading
+      readChunk();
+      return true;
+    } catch (err) {
+      console.error('Error sending file:', err);
+      setError(`Failed to send file: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      return false;
+    }
+  }, [dataChannel]);
+
+  // Close connection
+  const closeConnection = useCallback(() => {
+    console.log('Closing connection');
+    cleanupConnection();
+    return true;
+  }, [cleanupConnection]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanupConnection();
+    };
+  }, [cleanupConnection]);
+
+  return {
+    connectionState,
+    dataChannel,
+    error,
+    receivedFiles,
+    setConnectionId,
+    createConnection,
+    joinConnection,
+    sendFile,
+    closeConnection
+  };
 }

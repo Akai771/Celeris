@@ -1,20 +1,51 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Download, FileIcon, Loader2, CheckCircle, XCircle, Trash2, RefreshCw } from "lucide-react";
+import { 
+  ChevronLeft, 
+  Download, 
+  RefreshCw, 
+  CheckCircle, 
+  AlertTriangle,
+  X,
+  Upload,
+  FileIcon,
+  LinkIcon,
+  Copy,
+  Save
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import BlurFade from "@/components/ui/blur-fade";
 import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from "@/components/ui/table";
 import { BorderBeam } from "@/components/ui/border-beam";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { useWebRTC, ConnectionState } from "@/hooks/useWebRTC";
 import { toast } from "@/hooks/use-toast";
+import { Progress } from "@/components/ui/progress";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription, 
+  DialogFooter 
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { FileReceiver } from "@/lib/transferFile";
+import { useWebRTC } from "@/hooks/useWebRTC";
 
-// Reuse the formatFileSize function
+// Define connection states for UI feedback
+enum ConnectionUIState {
+  IDLE = "idle",
+  JOINING = "joining",
+  WAITING = "waiting",
+  CONNECTED = "connected",
+  RECEIVING = "receiving",
+  COMPLETE = "complete",
+  ERROR = "error"
+}
+
+// Format file size for display
 function formatFileSize(size: number): string {
   if (size < 1024) return size + " B";
   if (size < 1024 * 1024) return (size / 1024).toFixed(1) + " KB";
@@ -22,158 +53,289 @@ function formatFileSize(size: number): string {
   return (size / (1024 * 1024 * 1024)).toFixed(1) + " GB";
 }
 
-function ConnectionStatusIndicator({ state }: { state: ConnectionState }) {
-  switch (state) {
-    case ConnectionState.CONNECTED:
-      return (
-        <div className="flex items-center gap-2 text-green-500">
-          <CheckCircle size={16} />
-          <span>Connected</span>
-        </div>
-      );
-    case ConnectionState.CONNECTING:
-      return (
-        <div className="flex items-center gap-2 text-blue-500">
-          <Loader2 size={16} className="animate-spin" />
-          <span>Connecting...</span>
-        </div>
-      );
-    case ConnectionState.DISCONNECTED:
-      return (
-        <div className="flex items-center gap-2 text-gray-400">
-          <XCircle size={16} />
-          <span>Disconnected</span>
-        </div>
-      );
-    case ConnectionState.ERROR:
-      return (
-        <div className="flex items-center gap-2 text-red-500">
-          <XCircle size={16} />
-          <span>Connection Error</span>
-        </div>
-      );
-    default:
-      return null;
-  }
-}
-
 export default function Receive() {
+  // Router and navigation
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [connectionId, setConnectionId] = useState("");
-  const [inputConnectionId, setInputConnectionId] = useState("");
-  const [isDialogOpen, setDialogOpen] = useState(false);
-  const [showConnectModal, setShowConnectModal] = useState(false);
   
+  // Connection state
+  const [uiState, setUIState] = useState<ConnectionUIState>(ConnectionUIState.IDLE);
+  const [connectionIdInput, setConnectionIdInput] = useState<string>("");
+  const [connectionId, setConnectionId] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
+  
+  // File state
+  const [receivedFiles, setReceivedFiles] = useState<File[]>([]);
+  const [downloadProgress, setDownloadProgress] = useState<{[key: string]: number}>({});
+  const fileReceiverRef = useRef<FileReceiver | null>(null);
+  
+  // Dialog state
+  const [isConnectDialogOpen, setConnectDialogOpen] = useState<boolean>(false);
+  const [isStatusDialogOpen, setStatusDialogOpen] = useState<boolean>(false);
+  
+  // WebRTC hook
   const { 
-    connectionState, 
-    createConnection, 
-    closeConnection, 
-    setRemoteConnectionId,
-    receivedFiles,
-    transferProgress,
-    error
+    connectionState,
+    dataChannel,
+    error: webRTCError,
+    setConnectionId: setWebRTCConnectionId,
+    joinConnection,
+    closeConnection
   } = useWebRTC("ws://localhost:8080");
-
-  // Handle URL connection ID
+  
+  // Initialize from URL parameter
   useEffect(() => {
     const id = searchParams.get("id");
-    if (id) {
+    console.log("URL connection ID:", id);
+    
+    if (id && id.trim() !== "") {
+      console.log("Setting connection ID from URL:", id);
       setConnectionId(id);
-      setInputConnectionId(id);
+      setConnectionIdInput(id);
+      
+      // Slight delay to ensure the WebRTC hook is fully initialized
+      setTimeout(() => {
+        console.log("Connecting with ID from URL:", id);
+        handleConnect(id);
+      }, 500);
     }
-  }, [searchParams]);
-
-  // Create connection when ID is available
+  }, []);
+  
+  // Watch for WebRTC errors
   useEffect(() => {
-    if (connectionId && connectionState === ConnectionState.DISCONNECTED) {
-      setRemoteConnectionId(connectionId);
-      createConnection();
-    }
-  }, [connectionId, connectionState, setRemoteConnectionId, createConnection]);
-
-  // Handle errors and connection status changes
-  useEffect(() => {
-    if (error) {
+    if (webRTCError) {
+      setError(webRTCError);
+      setUIState(ConnectionUIState.ERROR);
+      
       toast({
         variant: "destructive",
         title: "Connection Error",
-        description: error
+        description: webRTCError,
       });
     }
-    
-    if (connectionState === ConnectionState.CONNECTED) {
-      toast({
-        variant: "default",
-        title: "Connected",
-        description: "Connected to the sender. Files will appear as they are transferred."
-      });
-    }
-  }, [error, connectionState]);
-
-  const handleDisconnect = () => {
-    closeConnection();
-    router.push("/");
-  };
-
-  const handleConnect = () => {
-    if (inputConnectionId) {
-      setConnectionId(inputConnectionId);
-      setShowConnectModal(false);
+  }, [webRTCError]);
+  
+  // Initialize the file receiver when data channel is ready
+  useEffect(() => {
+    if (dataChannel && !fileReceiverRef.current) {
+      // Create file receiver with callbacks for progress and completion
+      fileReceiverRef.current = new FileReceiver(
+        // Progress callback
+        (progress) => {
+          if (fileReceiverRef.current?.fileInfo) {
+            setDownloadProgress(prev => ({
+              ...prev, 
+              [fileReceiverRef.current!.fileInfo!.name]: progress
+            }));
+          }
+        },
+        // File complete callback
+        (file) => {
+          // Add to received files
+          setReceivedFiles(prev => [...prev, file]);
+          
+          toast({
+            title: "File Received",
+            description: `Successfully received ${file.name}`,
+          });
+        }
+      );
       
-      // Create the connection
-      setRemoteConnectionId(inputConnectionId);
-      createConnection();
-    } else {
+      // Set up data channel message handler
+      dataChannel.onmessage = (event) => {
+        // Set UI state to receiving when data starts coming in
+        setUIState(ConnectionUIState.RECEIVING);
+        
+        // Process the message
+        if (fileReceiverRef.current) {
+          fileReceiverRef.current.processMessage(event.data);
+        }
+      };
+    }
+  }, [dataChannel]);
+  
+  // Update UI based on connection state changes
+  useEffect(() => {
+    switch (connectionState) {
+      case "new":
+        setUIState(ConnectionUIState.IDLE);
+        break;
+      case "connecting":
+        setUIState(ConnectionUIState.JOINING);
+        break;
+      case "connected":
+        setUIState(ConnectionUIState.CONNECTED);
+        setStatusDialogOpen(true);
+        
+        toast({
+          title: "Connection Established",
+          description: "Ready to receive files.",
+        });
+        break;
+      case "disconnected":
+      case "failed":
+        if (uiState !== ConnectionUIState.COMPLETE) {
+          setUIState(ConnectionUIState.ERROR);
+          if (connectionState === "failed") {
+            toast({
+              variant: "destructive",
+              title: "Connection Failed",
+              description: "Could not establish connection with peer.",
+            });
+          }
+        }
+        break;
+    }
+  }, [connectionState, uiState]);
+  
+  // Handle connecting to a peer
+  const handleConnect = async (id?: string) => {
+    const connId = id || connectionIdInput;
+    
+    if (!connId.trim()) {
       toast({
         variant: "destructive",
-        title: "Missing Connection ID",
-        description: "Please enter a valid connection ID."
+        title: "No Connection ID",
+        description: "Please enter a connection ID or use a valid link.",
       });
-    }
-  };
-
-  const handleRetry = () => {
-    closeConnection();
-    setTimeout(() => {
-      setRemoteConnectionId(connectionId);
-      createConnection();
-    }, 500);
-  };
-
-  const downloadFile = (file: File) => {
-    const url = URL.createObjectURL(file);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const downloadAllFiles = () => {
-    if (receivedFiles.length === 0) return;
-    
-    // For a single file, use the direct method
-    if (receivedFiles.length === 1) {
-      downloadFile(receivedFiles[0]);
       return;
     }
     
-    // For multiple files, we would need to zip them
-    // This is a simplified approach that downloads them one by one
-    receivedFiles.forEach(file => {
-      downloadFile(file);
-    });
+    try {
+      setUIState(ConnectionUIState.JOINING);
+      setConnectionId(connId);
+      setWebRTCConnectionId(connId);
+      setConnectDialogOpen(false);
+      
+      // Join the WebRTC connection
+      const success = await joinConnection();
+      
+      if (success) {
+        setUIState(ConnectionUIState.WAITING);
+      } else {
+        throw new Error("Failed to join connection");
+      }
+    } catch (err) {
+      setUIState(ConnectionUIState.ERROR);
+      setError(err instanceof Error ? err.message : "Unknown error");
+      
+      toast({
+        variant: "destructive",
+        title: "Connection Error",
+        description: "Failed to connect. Please check the connection ID and try again.",
+      });
+    }
+  };
+  
+  // Disconnect from current session
+  const handleDisconnect = () => {
+    closeConnection();
+    fileReceiverRef.current?.reset();
+    setStatusDialogOpen(false);
+    
+    // If no files were received, reset completely
+    if (receivedFiles.length === 0) {
+      setUIState(ConnectionUIState.IDLE);
+      setConnectionId("");
+      setConnectionIdInput("");
+      router.push("/share/receive");
+    } else {
+      setUIState(ConnectionUIState.COMPLETE);
+    }
+  };
+  
+  // Save a received file to disk
+  const saveFile = (file: File) => {
+    // Create a URL for the file
+    const url = URL.createObjectURL(file);
+    
+    // Create a download link
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name;
+    
+    // Trigger the download
+    document.body.appendChild(a);
+    a.click();
+    
+    // Clean up
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     
     toast({
-      variant: "default",
-      title: "Downloading Files",
-      description: "Your files are being downloaded."
+      title: "Download Started",
+      description: `Saving ${file.name} to your device`,
     });
   };
+  
+  // Save all received files
+  const saveAllFiles = () => {
+    if (receivedFiles.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "No Files",
+        description: "No files have been received yet.",
+      });
+      return;
+    }
+    
+    // Save each file
+    receivedFiles.forEach(file => saveFile(file));
+  };
+  
+  // Start a new session
+  const startNewSession = () => {
+    closeConnection();
+    fileReceiverRef.current?.reset();
+    setUIState(ConnectionUIState.IDLE);
+    setConnectionId("");
+    setConnectionIdInput("");
+    setReceivedFiles([]);
+    setDownloadProgress({});
+    setError(null);
+    router.push("/share/receive");
+  };
+  
+  // Render connection status indicator
+  const renderConnectionStatus = () => {
+    switch (uiState) {
+      case ConnectionUIState.IDLE:
+        return <span className="text-gray-400">Not connected</span>;
+      case ConnectionUIState.JOINING:
+      case ConnectionUIState.WAITING:
+        return (
+          <span className="text-yellow-400 flex items-center">
+            <RefreshCw className="animate-spin h-4 w-4 mr-2" />
+            {uiState === ConnectionUIState.JOINING ? "Joining connection..." : "Waiting for files..."}
+          </span>
+        );
+      case ConnectionUIState.CONNECTED:
+        return (
+          <span className="text-green-400 flex items-center">
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Connected
+          </span>
+        );
+      case ConnectionUIState.RECEIVING:
+        return <span className="text-blue-400">Receiving files...</span>;
+      case ConnectionUIState.COMPLETE:
+        return (
+          <span className="text-green-400 flex items-center">
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Transfer complete
+          </span>
+        );
+      case ConnectionUIState.ERROR:
+        return (
+          <span className="text-red-400 flex items-center">
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            Connection error
+          </span>
+        );
+    }
+  };
 
+  // Back button for navigation
   const BackButton = () => (
     <Link href="/">
       <button className="p-2 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500">
@@ -181,7 +343,7 @@ export default function Receive() {
       </button>
     </Link>
   );
-
+  
   return (
     <>
       <div className="p-4">
@@ -192,176 +354,250 @@ export default function Receive() {
               Receive Files with <span className="yellowtail text-orange-400 text-5xl">Ease</span>
             </h1>
           </BlurFade>
-          
           <BlurFade delay={0.5}>
-            <div className="mont text-lg text-gray-400 mt-4 flex flex-col sm:flex-row items-center gap-3">
-              <span>
-                {connectionId 
-                  ? "Connected with ID: " + connectionId.substring(0, 4) + "..." + connectionId.substring(connectionId.length - 4) 
-                  : "Paste a link or enter a connection ID to start receiving."
-                }
-              </span>
-              <ConnectionStatusIndicator state={connectionState} />
-              
-              {connectionState !== ConnectionState.CONNECTING && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={connectionId ? handleRetry : () => setShowConnectModal(true)}
-                  className="flex items-center gap-1"
-                >
-                  <RefreshCw size={14} />
-                  {connectionId ? "Retry Connection" : "Connect Manually"}
-                </Button>
-              )}
-            </div>
+            <span className="mont text-lg text-gray-400">
+              Enter a connection ID or paste a link to start receiving files.
+            </span>
           </BlurFade>
           
+          {/* Connection status indicator */}
+          <div className="w-full flex justify-center my-2">
+            {renderConnectionStatus()}
+          </div>
+          
           <div className="relative flex flex-col items-center justify-center bg-[#252525] w-[100dvh] h-[50dvh] p-4 rounded-md mt-5">
-            {transferProgress && (
-              <div className="absolute top-4 left-4 right-4 bg-[#1a1a1a] rounded-md p-3 space-y-2 z-10">
-                <div className="flex justify-between text-sm">
-                  <span>Receiving file...</span>
-                  <span>{transferProgress.percentage}%</span>
-                </div>
-                <Progress value={transferProgress.percentage} className="h-2" />
-                <div className="text-xs text-gray-400 text-right">
-                  {formatFileSize(transferProgress.receivedSize)} / {formatFileSize(transferProgress.totalSize)}
-                </div>
-              </div>
-            )}
-            
-            <ScrollArea className="w-full h-[70vh] overflow-y-auto">
-              {receivedFiles.length > 0 ? (
+            {receivedFiles.length > 0 ? (
+              <div className="scrollBar w-full h-[70vh] overflow-y-auto">
                 <Table className="w-full">
                   <TableHeader>
-                    <TableRow className="hover:bg-0">
+                    <TableRow className="hover:bg-transparent">
                       <TableHead className="w-[70dvh]">File Name</TableHead>
-                      <TableHead className="w-[20dvh]">Size</TableHead>
-                      <TableHead className="w-[10dvh]">Action</TableHead>
+                      <TableHead className="w-[15dvh]">Size</TableHead>
+                      <TableHead className="w-[15dvh]">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {receivedFiles.map((file, index) => (
-                      <TableRow key={index} className="hover:bg-[#2a2a2a]">
-                        <TableCell className="font-medium mont text-orange-400">{file.name}</TableCell>
-                        <TableCell className="text-xs mont">{formatFileSize(file.size)}</TableCell>
+                      <TableRow key={index} className="hover:bg-[#303030]">
+                        <TableCell className="font-medium mont text-orange-400">
+                          {file.name}
+                        </TableCell>
+                        <TableCell className="text-xs mont">
+                          {formatFileSize(file.size)}
+                        </TableCell>
                         <TableCell>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="p-0 h-8 w-8"
-                            onClick={() => downloadFile(file)}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="flex items-center gap-1 hover:bg-orange-500/20 hover:text-orange-400"
+                            onClick={() => saveFile(file)}
                           >
-                            <Download size={16} className="text-orange-400" />
+                            <Download className="h-4 w-4" />
+                            <span className="text-xs">Save</span>
                           </Button>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                  {connectionState === ConnectionState.CONNECTED ? (
-                    <>
-                      <FileIcon size={48} />
-                      <p className="mt-4 text-center">Waiting for files to be sent...</p>
-                    </>
-                  ) : connectionState === ConnectionState.CONNECTING ? (
-                    <>
-                      <Loader2 size={48} className="animate-spin text-orange-400" />
-                      <p className="mt-4 text-center">Establishing connection...</p>
-                    </>
-                  ) : connectionState === ConnectionState.ERROR ? (
-                    <>
-                      <XCircle size={48} className="text-red-500" />
-                      <p className="mt-4 text-center">Connection error. Please try again.</p>
-                    </>
-                  ) : (
-                    <>
-                      <FileIcon size={48} />
-                      <p className="mt-4 text-center">Connect to start receiving files.</p>
-                    </>
-                  )}
-                </div>
-              )}
-            </ScrollArea>
-            <BorderBeam size={150} duration={10} className="z-40" colorFrom="#ff7b00" colorTo="#fcbb7e" />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full">
+                {uiState === ConnectionUIState.IDLE ? (
+                  <div className="text-center">
+                    <FileIcon className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+                    <p className="mont text-gray-400 mb-6">
+                      No files received yet. Connect to start receiving files.
+                    </p>
+                    <Button 
+                      className="mont font-bold bg-orange-500 hover:bg-orange-600 mb-4"
+                      onClick={() => setConnectDialogOpen(true)}
+                    >
+                      <LinkIcon className="w-4 h-4 mr-2" />
+                      Enter Connection ID
+                    </Button>
+                  </div>
+                ) : uiState === ConnectionUIState.JOINING || uiState === ConnectionUIState.WAITING ? (
+                  <div className="text-center">
+                    <RefreshCw className="w-16 h-16 text-orange-400 mx-auto mb-4 animate-spin" />
+                    <p className="mont text-gray-300 mb-2">
+                      {uiState === ConnectionUIState.JOINING ? "Joining connection..." : "Waiting for sender..."}
+                    </p>
+                    <p className="mont text-gray-500 text-sm">
+                      Connection ID: {connectionId}
+                    </p>
+                  </div>
+                ) : uiState === ConnectionUIState.ERROR ? (
+                  <div className="text-center">
+                    <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                    <p className="mont text-red-400 mb-2">
+                      Connection Error
+                    </p>
+                    <p className="mont text-gray-400 text-sm mb-6">
+                      {error || "Failed to establish connection. Please try again."}
+                    </p>
+                    <Button 
+                      className="mont font-bold bg-orange-500 hover:bg-orange-600"
+                      onClick={startNewSession}
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Try Again
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <Upload className="w-16 h-16 text-orange-400 mx-auto mb-4" />
+                    <p className="mont text-gray-300 mb-2">
+                      Ready to receive files
+                    </p>
+                    <p className="mont text-gray-500 text-sm">
+                      Waiting for sender to transfer files...
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            <BorderBeam
+              size={150}
+              duration={10}
+              className="z-40"
+              colorFrom="#ff7b00"
+              colorTo="#fcbb7e"
+            />
           </div>
           
-          {receivedFiles.length > 0 && (
-            <Button
-              className="mt-5 mont font-bold transition-all ease-in-out hover:bg-orange-500 flex items-center gap-2"
-              onClick={downloadAllFiles}
-            >
-              Download All <Download className="w-4 h-4" />
-            </Button>
-          )}
-
-          <Button
-            variant="outline"
-            className="mt-3 mont text-sm"
-            onClick={handleDisconnect}
-          >
-            Disconnect & Return Home
-          </Button>
+          {/* Action buttons */}
+          <div className="flex flex-col sm:flex-row gap-2 mt-5">
+            {receivedFiles.length > 0 && (
+              <Button 
+                className="mont font-bold transition-all ease-in-out hover:bg-orange-500"
+                onClick={saveAllFiles}
+              >
+                Download All <Download className="w-5 ml-2" />
+              </Button>
+            )}
+            
+            {(uiState === ConnectionUIState.CONNECTED || 
+              uiState === ConnectionUIState.RECEIVING || 
+              uiState === ConnectionUIState.COMPLETE) && (
+              <Button 
+                variant="outline" 
+                className="mont font-bold transition-all ease-in-out"
+                onClick={startNewSession}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                New Session
+              </Button>
+            )}
+            
+            {(uiState === ConnectionUIState.IDLE || uiState === ConnectionUIState.ERROR) && (
+              <Button 
+                className="mont font-bold transition-all ease-in-out hover:bg-orange-500"
+                onClick={() => setConnectDialogOpen(true)}
+              >
+                <LinkIcon className="w-4 h-4 mr-2" />
+                Connect
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Connect Manually Dialog */}
-      <Dialog open={showConnectModal} onOpenChange={setShowConnectModal}>
+      {/* Connection dialog */}
+      <Dialog open={isConnectDialogOpen} onOpenChange={setConnectDialogOpen}>
         <DialogContent className="bg-[#1d1d1d] text-white border-none">
           <DialogHeader>
-            <DialogTitle>Enter Connection ID</DialogTitle>
-            <DialogDescription className="text-gray-400">
-              Enter the connection ID from the sender to establish a connection.
+            <DialogTitle className="mont text-lg font-bold">
+              Enter Connection ID
+            </DialogTitle>
+            <DialogDescription className="mont text-gray-400 text-sm">
+              Enter the connection ID or paste the link provided by the sender.
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-4">
-            <input
-              type="text"
-              className="w-full p-2 bg-[#252525] text-white rounded"
-              value={inputConnectionId}
-              onChange={(e) => setInputConnectionId(e.target.value)}
-              placeholder="Enter connection ID or full URL"
+          
+          <div className="space-y-4 my-2">
+            <Input
+              placeholder="Connection ID or full link"
+              className="bg-[#252525] border-gray-700 text-white mont focus-visible:ring-orange-500"
+              value={connectionIdInput}
+              onChange={(e) => {
+                const value = e.target.value;
+                // Extract ID if it's a URL
+                if (value.includes('?id=')) {
+                  try {
+                    const url = new URL(value);
+                    const id = url.searchParams.get('id');
+                    if (id) {
+                      setConnectionIdInput(id);
+                      return;
+                    }
+                  } catch {}
+                }
+                setConnectionIdInput(value);
+              }}
             />
-            <div className="text-xs text-gray-500 mt-2">
-              The connection ID is typically included in the URL shared by the sender.
-            </div>
           </div>
-          <DialogFooter className="mt-4">
-            <Button variant="ghost" onClick={() => setShowConnectModal(false)}>
+          
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setConnectDialogOpen(false)}
+            >
               Cancel
             </Button>
-            <Button onClick={handleConnect}>
+            <Button
+              className="mont font-bold bg-orange-500 hover:bg-orange-600"
+              onClick={() => handleConnect()}
+              disabled={!connectionIdInput.trim()}
+            >
               Connect
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Connection Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="bg-black">
+      
+      {/* Connection status dialog */}
+      <Dialog open={isStatusDialogOpen} onOpenChange={setStatusDialogOpen}>
+        <DialogContent className="bg-[#1d1d1d] text-white border-none">
           <DialogHeader>
-            <DialogTitle>Connection Status</DialogTitle>
-            <DialogDescription>
-              {connectionState === ConnectionState.CONNECTED 
-                ? "Connected successfully. You can now receive files."
-                : connectionState === ConnectionState.CONNECTING
-                ? "Establishing connection..."
-                : connectionState === ConnectionState.ERROR
-                ? "Connection error. Please try again."
-                : "Disconnected. Please reconnect to continue."
-              }
+            <DialogTitle className="mont text-lg font-bold">
+              Connection Established
+            </DialogTitle>
+            <DialogDescription className="mont text-gray-400 text-sm">
+              You are now connected to the sender. Waiting for files...
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-center my-4">
-            <ConnectionStatusIndicator state={connectionState} />
+          
+          <div className="bg-black/30 rounded-md p-3 mb-4">
+            <h3 className="font-medium text-sm mb-1">Connection Info</h3>
+            <div className="flex justify-between items-center">
+              <div className="text-sm flex items-center gap-2">
+                <span className="text-gray-400">ID:</span>
+                <code className="bg-black/30 px-2 py-1 rounded text-orange-400">
+                  {connectionId}
+                </code>
+                <button 
+                  className="text-gray-400 hover:text-white"
+                  onClick={() => navigator.clipboard.writeText(connectionId)}
+                >
+                  <Copy className="h-3 w-3" />
+                </button>
+              </div>
+              <div className="text-green-400 flex items-center">
+                <CheckCircle className="h-4 w-4 mr-1" />
+                Connected
+              </div>
+            </div>
           </div>
+          
           <DialogFooter>
-            <Button onClick={() => setDialogOpen(false)}>
-              Close
+            <Button
+              variant="destructive"
+              onClick={handleDisconnect}
+              className="mont"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Disconnect
             </Button>
           </DialogFooter>
         </DialogContent>
