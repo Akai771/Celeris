@@ -98,7 +98,7 @@ export function useWebRTC(signalingUrl: string) {
       console.log("Initializing WebRTC peer connection");
       
       // Configure ICE servers for better connectivity
-      const configuration = {
+      const configuration: RTCConfiguration = {
         iceServers: [
           // Use multiple STUN servers to improve connectivity chances
           { urls: 'stun:stun.l.google.com:19302' },
@@ -109,8 +109,8 @@ export function useWebRTC(signalingUrl: string) {
         ],
         // These options help improve connection robustness
         iceCandidatePoolSize: 10,
-        bundlePolicy: 'max-bundle',
-        rtcpMuxPolicy: 'require'
+        bundlePolicy: 'max-bundle' as RTCBundlePolicy,
+        rtcpMuxPolicy: 'require' as RTCRtcpMuxPolicy
       };
 
       const pc = new RTCPeerConnection(configuration);
@@ -158,7 +158,6 @@ export function useWebRTC(signalingUrl: string) {
         switch (pc.iceConnectionState) {
           case 'checking':
             console.log("ICE checking - connection attempt in progress");
-            // Don't change connection state here, wait for success or failure
             break;
           case 'connected':
           case 'completed':
@@ -173,7 +172,7 @@ export function useWebRTC(signalingUrl: string) {
           case 'disconnected':
             console.log("ICE disconnected - connection may recover automatically");
             // Don't change state to DISCONNECTED yet, as it might recover
-            // Instead, set a timeout to change state if it doesn't recover
+            // Set a timeout to change state if it doesn't recover
             const disconnectTimeout = setTimeout(() => {
               if (pc.iceConnectionState === 'disconnected') {
                 console.log("ICE still disconnected after timeout, marking as DISCONNECTED");
@@ -224,8 +223,9 @@ export function useWebRTC(signalingUrl: string) {
       console.log("Peer connection initialized successfully");
       return pc;
     } catch (err) {
-      console.error('Error creating peer connection:', err);
-      setError(`Failed to create peer connection: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      const error = err as Error;
+      console.error('Error creating peer connection:', error);
+      setError(`Failed to create peer connection: ${error.message || 'Unknown error'}`);
       return null;
     }
   }, [connectionId]);
@@ -425,8 +425,9 @@ export function useWebRTC(signalingUrl: string) {
                 connectionId: connectionId
               }));
             } catch (err) {
-              console.error('Error processing offer:', err);
-              setError(`Error processing offer: ${err.message}`);
+              const error = err as Error;
+              console.error('Error processing offer:', error);
+              setError(`Error processing offer: ${error.message}`);
             }
           }
           else if (message.type === 'answer' && peerConnection.current) {
@@ -435,8 +436,9 @@ export function useWebRTC(signalingUrl: string) {
               await peerConnection.current.setRemoteDescription(new RTCSessionDescription(message.answer));
               console.log('Set remote description from answer');
             } catch (err) {
-              console.error('Error setting remote description from answer:', err);
-              setError(`Error processing answer: ${err.message}`);
+              const error = err as Error;
+              console.error('Error setting remote description from answer:', error);
+              setError(`Error processing answer: ${error.message}`);
             }
           }
           else if (message.type === 'candidate' && peerConnection.current) {
@@ -458,16 +460,18 @@ export function useWebRTC(signalingUrl: string) {
             setError(`Server error: ${message.message}`);
           }
         } catch (err) {
-          console.error('Error handling signaling message:', err);
+          const error = err as Error;
+          console.error('Error handling signaling message:', error);
           console.error('Raw message:', typeof event.data === 'string' ? event.data.substring(0, 100) : 'non-string data');
-          setError(`Error processing signaling message: ${err.message}`);
+          setError(`Error processing signaling message: ${error.message}`);
         }
       };
 
       return ws;
     } catch (err) {
-      console.error('Error connecting to signaling server:', err);
-      setError(`Failed to connect to signaling server: ${err.message}`);
+      const error = err as Error;
+      console.error('Error connecting to signaling server:', error);
+      setError(`Failed to connect to signaling server: ${error.message}`);
       return null;
     }
   }, [connectionId, connectionState]);
@@ -554,8 +558,9 @@ export function useWebRTC(signalingUrl: string) {
       console.log("Connection setup complete");
       return true;
     } catch (err) {
-      console.error('Error creating connection:', err);
-      setError(`Failed to create connection: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      const error = err as Error;
+      console.error('Error creating connection:', error);
+      setError(`Failed to create connection: ${error.message || 'Unknown error'}`);
       setConnectionState(ConnectionState.FAILED);
       cleanupConnection();
       return false;
@@ -623,8 +628,9 @@ export function useWebRTC(signalingUrl: string) {
       console.log("Join connection setup complete, waiting for offer");
       return true;
     } catch (err) {
-      console.error('Error joining connection:', err);
-      setError(`Failed to join connection: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      const error = err as Error;
+      console.error('Error joining connection:', error);
+      setError(`Failed to join connection: ${error.message || 'Unknown error'}`);
       setConnectionState(ConnectionState.FAILED);
       cleanupConnection();
       return false;
@@ -688,8 +694,9 @@ export function useWebRTC(signalingUrl: string) {
       readChunk();
       return true;
     } catch (err) {
-      console.error('Error sending file:', err);
-      setError(`Failed to send file: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      const error = err as Error;
+      console.error('Error sending file:', error);
+      setError(`Failed to send file: ${error.message || 'Unknown error'}`);
       return false;
     }
   }, [dataChannel]);
