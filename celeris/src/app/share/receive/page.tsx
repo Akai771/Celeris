@@ -170,17 +170,17 @@ function ReceiveContent() {
         (progress) => {
           const fileInfo = fileReceiverRef.current?.fileInfo;
           if (fileInfo?.name) {
-            setDownloadProgress(prev => ({
+            setDownloadProgress((prev: Record<string, number>) => ({
               ...prev, 
               [fileInfo.name]: progress
             }));
           }
         },
         // File complete callback
-        (file) => {
+        (file: File) => {
           console.log("File complete callback triggered:", file.name);
           // Add to received files
-          setReceivedFiles(prev => [...prev, file]);
+          setReceivedFiles((prev: File[]) => [...prev, file]);
           
           toast({
             title: "File Received",
@@ -190,7 +190,7 @@ function ReceiveContent() {
       );
       
       // Set up data channel message handler
-      dataChannel.onmessage = (event) => {
+      dataChannel.onmessage = (event: MessageEvent) => {
         console.log("Data channel message received, type:", typeof event.data);
         // Set UI state to receiving when data starts coming in
         setUIState(ConnectionUIState.RECEIVING);
@@ -377,7 +377,7 @@ function ReceiveContent() {
     }
     
     // Save each file
-    receivedFiles.forEach(file => saveFile(file));
+    receivedFiles.forEach((file: File) => saveFile(file));
   };
   
   // Start a new session
@@ -479,7 +479,7 @@ function ReceiveContent() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {receivedFiles.map((file, index) => (
+                    {receivedFiles.map((file: File, index: number) => (
                       <TableRow key={index} className="hover:bg-[#303030]">
                         <TableCell className="font-medium mont text-orange-400">
                           {file.name}
@@ -622,7 +622,7 @@ function ReceiveContent() {
               placeholder="Connection ID or full link"
               className="bg-[#252525] border-gray-700 text-white mont focus-visible:ring-orange-500"
               value={connectionIdInput}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                 const value = e.target.value;
                 // Extract ID if it's a URL
                 if (value.includes('?id=')) {
