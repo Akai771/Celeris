@@ -6,11 +6,15 @@ const DEBUG = true;
 // Create a WebSocket server on port 8080
 const wss = new WebSocket.Server({ port: 8080 });
 
-// Track active connections by connection ID
+// Track active connections by connection ID -> array of WebSocket clients
+// This allows multiple clients (sender + receiver) to be in the same connection
 const connections = new Map();
 
-// Track client-connectionId mapping
+// Track client-connectionId mapping (clientId -> connectionId)
 const clientConnections = new Map();
+
+// Track roles (clientId -> 'sender' | 'receiver')
+const clientRoles = new Map();
 
 console.log('WebRTC Signaling Server starting...');
 console.log('Debug mode:', DEBUG ? 'ENABLED' : 'DISABLED');
@@ -117,10 +121,36 @@ wss.on('connection', (ws, req) => {
         // Clean up connections
         if (clientConnections.has(ws.clientId)) {
             const connectionId = clientConnections.get(ws.clientId);
-            connections.delete(connectionId);
-            clientConnections.delete(ws.clientId);
             
-            console.log(`Removed connection ${connectionId}`);
+            // Remove this client from the connections array
+            if (connections.has(connectionId)) {
+                const clients = connections.get(connectionId);
+                const index = clients.indexOf(ws);
+                if (index > -1) {
+                    clients.splice(index, 1);
+                }
+                
+                // If no more clients, delete the connection entry
+                if (clients.length === 0) {
+                    connections.delete(connectionId);
+                    console.log(`Connection ${connectionId} removed (no clients remaining)`);
+                } else {
+                    console.log(`Client removed from connection ${connectionId}, ${clients.length} client(s) remaining`);
+                    
+                    // Notify remaining clients that a peer disconnected
+                    clients.forEach(client => {
+                        if (client.readyState === WebSocket.OPEN) {
+                            sendToClient(client, {
+                                type: 'peer-disconnected',
+                                connectionId: connectionId
+                            });
+                        }
+                    });
+                }
+            }
+            
+            clientConnections.delete(ws.clientId);
+            clientRoles.delete(ws.clientId);
         }
     });
     
@@ -157,13 +187,23 @@ function handleOffer(ws, data) {
         return;
     }
     
-    // Add to connection tracking
-    connections.set(data.connectionId, ws);
-    clientConnections.set(ws.clientId, data.connectionId);
+    // Ensure this client is tracked for this connection
+    if (!clientConnections.has(ws.clientId)) {
+        clientConnections.set(ws.clientId, data.connectionId);
+        
+        if (!connections.has(data.connectionId)) {
+            connections.set(data.connectionId, []);
+        }
+        const clients = connections.get(data.connectionId);
+        if (!clients.includes(ws)) {
+            clients.push(ws);
+        }
+    }
     
-    console.log(`Registered offer for connection ${data.connectionId}`);
+    const clientCount = connections.get(data.connectionId)?.length || 0;
+    console.log(`Received offer for connection ${data.connectionId} (${clientCount} clients in connection)`);
     
-    // Broadcast offer to any waiting clients for this ID
+    // Broadcast offer to all other clients (receivers) in this connection
     broadcastToConnectionId(data.connectionId, {
         type: 'offer',
         offer: data.offer,
@@ -213,11 +253,23 @@ function handleCandidate(ws, data) {
 function handleRegister(ws, data) {
     const connectionId = data.connectionId || generateId();
     
-    // Register this client with the connection
-    connections.set(connectionId, ws);
-    clientConnections.set(ws.clientId, connectionId);
+    // Initialize or get existing clients array for this connection
+    if (!connections.has(connectionId)) {
+        connections.set(connectionId, []);
+    }
     
-    console.log(`Client ${ws.clientId} registered connection ${connectionId}`);
+    // Add this client to the connection (as sender)
+    const clients = connections.get(connectionId);
+    if (!clients.includes(ws)) {
+        clients.push(ws);
+    }
+    
+    // Track the mapping and role
+    clientConnections.set(ws.clientId, connectionId);
+    clientRoles.set(ws.clientId, 'sender');
+    
+    console.log(`Client ${ws.clientId} registered as SENDER for connection ${connectionId}`);
+    console.log(`Connection ${connectionId} now has ${clients.length} client(s)`);
     
     // Send confirmation to client
     sendToClient(ws, {
@@ -238,14 +290,35 @@ function handleJoin(ws, data) {
     
     console.log(`Client ${ws.clientId} joining connection ${data.connectionId}`);
     
-    // Add to connection tracking
+    // Initialize connections array if it doesn't exist
+    if (!connections.has(data.connectionId)) {
+        connections.set(data.connectionId, []);
+    }
+    
+    // Add this client to the connection (as receiver)
+    const clients = connections.get(data.connectionId);
+    if (!clients.includes(ws)) {
+        clients.push(ws);
+    }
+    
+    // Track the mapping and role
     clientConnections.set(ws.clientId, data.connectionId);
+    clientRoles.set(ws.clientId, 'receiver');
+    
+    console.log(`Client ${ws.clientId} joined as RECEIVER for connection ${data.connectionId}`);
+    console.log(`Connection ${data.connectionId} now has ${clients.length} client(s)`);
     
     // Notify client of successful join
     sendToClient(ws, {
         type: 'joined',
         connectionId: data.connectionId
     });
+    
+    // Notify sender that a receiver has joined (so sender can resend offer if needed)
+    broadcastToConnectionId(data.connectionId, {
+        type: 'peer-joined',
+        connectionId: data.connectionId
+    }, ws);
 }
 
 // Send message to a specific client

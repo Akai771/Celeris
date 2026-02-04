@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { 
@@ -53,10 +53,13 @@ function formatFileSize(size: number): string {
   return (size / (1024 * 1024 * 1024)).toFixed(1) + " GB";
 }
 
-export default function Receive() {
+function ReceiveContent() {
   // Router and navigation
   const router = useRouter();
   const searchParams = useSearchParams();
+  
+  // Client-side only flag to prevent hydration issues
+  const [isMounted, setIsMounted] = useState(false);
   
   // Connection state
   const [uiState, setUIState] = useState<ConnectionUIState>(ConnectionUIState.IDLE);
@@ -73,6 +76,9 @@ export default function Receive() {
   const [isConnectDialogOpen, setConnectDialogOpen] = useState<boolean>(false);
   const [isStatusDialogOpen, setStatusDialogOpen] = useState<boolean>(false);
   
+  // Ref to prevent multiple connection attempts
+  const hasInitialized = useRef<boolean>(false);
+  
   // WebRTC hook
   const { 
     connectionState,
@@ -83,54 +89,96 @@ export default function Receive() {
     closeConnection
   } = useWebRTC("ws://localhost:8080");
   
-  // Initialize from URL parameter
+  // Set mounted flag on client side only
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+  
+  // Initialize from URL parameter - only run once
+  useEffect(() => {
+    // Prevent multiple initializations
+    if (hasInitialized.current) {
+      console.log("Already initialized, skipping");
+      return;
+    }
+    
     const id = searchParams.get("id");
     console.log("URL connection ID:", id);
     
     if (id && id.trim() !== "") {
+      hasInitialized.current = true;
       console.log("Setting connection ID from URL:", id);
       setConnectionId(id);
       setConnectionIdInput(id);
+      setWebRTCConnectionId(id);
+      setUIState(ConnectionUIState.JOINING);
       
-      // Slight delay to ensure the WebRTC hook is fully initialized
-      setTimeout(() => {
+      // Use a longer delay to ensure everything is set up
+      setTimeout(async () => {
         console.log("Connecting with ID from URL:", id);
-        handleConnect(id);
-      }, 500);
+        try {
+          const success = await joinConnection();
+          if (success) {
+            console.log("Join connection succeeded");
+            setUIState(ConnectionUIState.WAITING);
+          } else {
+            console.log("Join connection returned false");
+            setError("Failed to join connection");
+            setUIState(ConnectionUIState.ERROR);
+          }
+        } catch (err) {
+          console.error("Error joining connection:", err);
+          setError(err instanceof Error ? err.message : "Unknown error");
+          setUIState(ConnectionUIState.ERROR);
+        }
+      }, 100);
     }
-  }, []);
+  }, [searchParams, setWebRTCConnectionId, joinConnection]);
   
-  // Watch for WebRTC errors
+  // Watch for WebRTC errors - but only show error if it's a real problem
   useEffect(() => {
     if (webRTCError) {
-      setError(webRTCError);
-      setUIState(ConnectionUIState.ERROR);
+      console.log("WebRTC error received:", webRTCError, "Current UI state:", uiState);
       
-      toast({
-        variant: "destructive",
-        title: "Connection Error",
-        description: webRTCError,
-      });
+      // Only show error if we're not in the middle of connecting or already connected
+      // Some "errors" during connection establishment are transient
+      if (uiState === ConnectionUIState.CONNECTED || 
+          uiState === ConnectionUIState.RECEIVING) {
+        setError(webRTCError);
+        setUIState(ConnectionUIState.ERROR);
+        
+        toast({
+          variant: "destructive",
+          title: "Connection Error",
+          description: webRTCError,
+        });
+      } else {
+        // Log the error but don't show it to user during connection establishment
+        console.warn("WebRTC error during connection:", webRTCError);
+      }
     }
   }, [webRTCError]);
   
   // Initialize the file receiver when data channel is ready
   useEffect(() => {
-    if (dataChannel && !fileReceiverRef.current) {
-      // Create file receiver with callbacks for progress and completion
+    if (dataChannel) {
+      console.log("Data channel available, setting up file receiver");
+      
+      // Always create a fresh file receiver when data channel changes
       fileReceiverRef.current = new FileReceiver(
         // Progress callback
         (progress) => {
-          if (fileReceiverRef.current?.fileInfo) {
+          const fileInfo = fileReceiverRef.current?.fileInfo;
+          if (fileInfo?.name) {
             setDownloadProgress(prev => ({
               ...prev, 
-              [fileReceiverRef.current!.fileInfo!.name]: progress
+              [fileInfo.name]: progress
             }));
           }
         },
         // File complete callback
         (file) => {
+          console.log("File complete callback triggered:", file.name);
           // Add to received files
           setReceivedFiles(prev => [...prev, file]);
           
@@ -143,6 +191,7 @@ export default function Receive() {
       
       // Set up data channel message handler
       dataChannel.onmessage = (event) => {
+        console.log("Data channel message received, type:", typeof event.data);
         // Set UI state to receiving when data starts coming in
         setUIState(ConnectionUIState.RECEIVING);
         
@@ -151,14 +200,39 @@ export default function Receive() {
           fileReceiverRef.current.processMessage(event.data);
         }
       };
+      
+      // Also handle data channel state changes
+      dataChannel.onopen = () => {
+        console.log("Data channel opened on receive page");
+        setUIState(ConnectionUIState.CONNECTED);
+      };
+      
+      dataChannel.onclose = () => {
+        console.log("Data channel closed on receive page");
+        if (receivedFiles.length > 0) {
+          setUIState(ConnectionUIState.COMPLETE);
+        }
+      };
     }
+    
+    return () => {
+      // Cleanup when dataChannel changes or component unmounts
+      if (fileReceiverRef.current) {
+        fileReceiverRef.current.reset();
+      }
+    };
   }, [dataChannel]);
   
   // Update UI based on connection state changes
   useEffect(() => {
+    console.log("Connection state changed to:", connectionState);
+    
     switch (connectionState) {
       case "new":
-        setUIState(ConnectionUIState.IDLE);
+        // Don't reset to IDLE if we're already in a more advanced state
+        if (uiState === ConnectionUIState.IDLE) {
+          // Stay in IDLE
+        }
         break;
       case "connecting":
         setUIState(ConnectionUIState.JOINING);
@@ -166,6 +240,7 @@ export default function Receive() {
       case "connected":
         setUIState(ConnectionUIState.CONNECTED);
         setStatusDialogOpen(true);
+        setError(null); // Clear any previous errors
         
         toast({
           title: "Connection Established",
@@ -173,22 +248,35 @@ export default function Receive() {
         });
         break;
       case "disconnected":
-      case "failed":
-        if (uiState !== ConnectionUIState.COMPLETE) {
-          setUIState(ConnectionUIState.ERROR);
-          if (connectionState === "failed") {
-            toast({
-              variant: "destructive",
-              title: "Connection Failed",
-              description: "Could not establish connection with peer.",
-            });
+        // Only show error if we were previously connected or receiving
+        if (uiState === ConnectionUIState.CONNECTED || 
+            uiState === ConnectionUIState.RECEIVING) {
+          if (receivedFiles.length > 0) {
+            setUIState(ConnectionUIState.COMPLETE);
+          } else {
+            // Peer disconnected before sending files
+            console.log("Disconnected, but no files received yet");
           }
         }
         break;
+      case "failed":
+        // Only show error if we were actively connected or had gone past initial joining
+        // During initial connection, 'failed' might be temporary
+        console.log("Connection state failed, current UI state:", uiState);
+        if (uiState === ConnectionUIState.CONNECTED || 
+            uiState === ConnectionUIState.RECEIVING) {
+          setUIState(ConnectionUIState.ERROR);
+          toast({
+            variant: "destructive",
+            title: "Connection Failed",
+            description: "Lost connection with peer.",
+          });
+        }
+        break;
     }
-  }, [connectionState, uiState]);
+  }, [connectionState]); // Remove uiState from dependencies to prevent cascading updates
   
-  // Handle connecting to a peer
+  // Handle connecting to a peer (manual button click)
   const handleConnect = async (id?: string) => {
     const connId = id || connectionIdInput;
     
@@ -200,6 +288,14 @@ export default function Receive() {
       });
       return;
     }
+    
+    // Prevent double connection attempts
+    if (hasInitialized.current && uiState !== ConnectionUIState.ERROR && uiState !== ConnectionUIState.IDLE) {
+      console.log("Connection already in progress, skipping");
+      return;
+    }
+    
+    hasInitialized.current = true;
     
     try {
       setUIState(ConnectionUIState.JOINING);
@@ -218,6 +314,7 @@ export default function Receive() {
     } catch (err) {
       setUIState(ConnectionUIState.ERROR);
       setError(err instanceof Error ? err.message : "Unknown error");
+      hasInitialized.current = false; // Allow retry
       
       toast({
         variant: "destructive",
@@ -343,6 +440,11 @@ export default function Receive() {
       </button>
     </Link>
   );
+  
+  // Prevent hydration errors by not rendering until mounted on client
+  if (!isMounted) {
+    return null;
+  }
   
   return (
     <>
@@ -603,5 +705,18 @@ export default function Receive() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+// Export with Suspense boundary to prevent hydration errors
+export default function Receive() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    }>
+      <ReceiveContent />
+    </Suspense>
   );
 }

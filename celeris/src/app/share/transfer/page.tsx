@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { useDropzone } from "react-dropzone";
 import Link from "next/link";
 import { 
@@ -154,7 +154,10 @@ function generateConnectionId(length = 10) {
   return result;
 }
 
-export default function Transfer() {
+function TransferContent() {
+  // Client-side only flag to prevent hydration issues
+  const [isMounted, setIsMounted] = useState(false);
+  
   // File handling state
   const [files, setFiles] = useState<File[]>([]);
   const [transferProgress, setTransferProgress] = useState<{[key: string]: number}>({});
@@ -181,6 +184,11 @@ export default function Transfer() {
     error: webRTCError,
     closeConnection
   } = useWebRTC("ws://localhost:8080");
+  
+  // Set mounted flag on client side only
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   
   // Handle file drop
   const { getRootProps, getInputProps } = useDropzone({
@@ -212,47 +220,74 @@ export default function Transfer() {
   // Update UI state based on connection state
   useEffect(() => {
     if (webRTCError) {
-      setError(webRTCError);
-      setUIState(ConnectionUIState.ERROR);
-      toast({
-        variant: "destructive",
-        title: "Connection Error",
-        description: webRTCError,
-      });
+      console.log("WebRTC error received:", webRTCError, "Current UI state:", uiState);
+      
+      // Only show error if we're in a connected/transferring state
+      // During connection establishment, some errors are transient
+      if (uiState === ConnectionUIState.CONNECTED || 
+          uiState === ConnectionUIState.TRANSFERRING) {
+        setError(webRTCError);
+        setUIState(ConnectionUIState.ERROR);
+        toast({
+          variant: "destructive",
+          title: "Connection Error",
+          description: webRTCError,
+        });
+      } else {
+        console.warn("WebRTC error during setup:", webRTCError);
+      }
     }
   }, [webRTCError]);
   
   // Update UI based on connection state changes
   useEffect(() => {
+    console.log("Connection state changed to:", connectionState, "UI state:", uiState);
+    
     switch (connectionState) {
       case "new":
-        setUIState(ConnectionUIState.IDLE);
+        // Don't reset to IDLE if we're in READY state (waiting for peer)
+        if (uiState === ConnectionUIState.IDLE) {
+          // Stay in IDLE
+        }
         break;
       case "connecting":
-        setUIState(ConnectionUIState.CONNECTING);
+        // Only update if we're not already in a more advanced state
+        if (uiState !== ConnectionUIState.READY && 
+            uiState !== ConnectionUIState.CONNECTED &&
+            uiState !== ConnectionUIState.TRANSFERRING) {
+          setUIState(ConnectionUIState.CONNECTING);
+        }
         break;
       case "connected":
         setUIState(ConnectionUIState.CONNECTED);
+        setError(null); // Clear any previous errors
         toast({
           title: "Connection Established",
           description: "Ready to transfer files.",
         });
         break;
       case "disconnected":
+        // Only show error if we were actively connected or transferring
+        if (uiState === ConnectionUIState.CONNECTED || 
+            uiState === ConnectionUIState.TRANSFERRING) {
+          console.log("Disconnected while connected/transferring");
+          // Don't immediately mark as error - peer might just have received all files
+        }
+        break;
       case "failed":
-        if (uiState !== ConnectionUIState.COMPLETE) {
+        // Only show error if we had a peer and the connection failed
+        if (uiState === ConnectionUIState.CONNECTED || 
+            uiState === ConnectionUIState.TRANSFERRING) {
           setUIState(ConnectionUIState.ERROR);
-          if (connectionState === "failed") {
-            toast({
-              variant: "destructive",
-              title: "Connection Failed",
-              description: "Could not establish connection with peer.",
-            });
-          }
+          toast({
+            variant: "destructive",
+            title: "Connection Failed",
+            description: "Lost connection with peer.",
+          });
         }
         break;
     }
-  }, [connectionState, uiState]);
+  }, [connectionState]); // Remove uiState from dependencies
 
   // File management functions
   const handleRemoveFile = (f: File) =>
@@ -472,6 +507,11 @@ export default function Transfer() {
         );
     }
   };
+
+  // Prevent hydration errors by not rendering until mounted on client
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <>
@@ -763,5 +803,18 @@ export default function Transfer() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+// Export with Suspense boundary to prevent hydration errors
+export default function Transfer() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    }>
+      <TransferContent />
+    </Suspense>
   );
 }

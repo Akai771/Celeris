@@ -1,3 +1,5 @@
+// page.tsx (Splash Page)
+
 "use client";
 
 import React, { useState } from "react";

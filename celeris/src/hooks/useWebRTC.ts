@@ -19,24 +19,55 @@ export function useWebRTC(signalingUrl: string) {
   // Create refs to hold persistent values across renders
   const peerConnection = useRef<RTCPeerConnection | null>(null);
   const signalingConnection = useRef<WebSocket | null>(null);
+  const connectionIdRef = useRef<string | null>(null); // Ref to track connectionId without stale closures
+  const dataChannelRef = useRef<RTCDataChannel | null>(null); // Ref to track dataChannel without stale closures
   const fileChunks = useRef<Uint8Array[]>([]);
   const currentFileInfo = useRef<{ name: string, type: string, size: number } | null>(null);
   const bytesReceived = useRef<number>(0);
+  const pendingCandidates = useRef<RTCIceCandidate[]>([]); // Queue for ICE candidates before signaling is ready
+  const setupDataChannelRef = useRef<((channel: RTCDataChannel) => RTCDataChannel) | null>(null); // Ref to avoid stale closure
+  const hasRemotePeer = useRef<boolean>(false); // Track if we've connected with a remote peer (received answer/offer)
+
+  // Custom setter for connectionId that updates both state and ref
+  const updateConnectionId = useCallback((id: string | null) => {
+    connectionIdRef.current = id;
+    setConnectionId(id);
+  }, []);
+
+  // Send any queued ICE candidates
+  const flushPendingCandidates = useCallback(() => {
+    while (pendingCandidates.current.length > 0 && signalingConnection.current?.readyState === WebSocket.OPEN) {
+      const candidate = pendingCandidates.current.shift();
+      if (candidate) {
+        try {
+          signalingConnection.current.send(JSON.stringify({
+            type: 'candidate',
+            candidate: candidate,
+            connectionId: connectionIdRef.current
+          }));
+          console.log('Sent queued ICE candidate');
+        } catch (err) {
+          console.error('Error sending queued ICE candidate:', err);
+        }
+      }
+    }
+  }, []);
 
   // Clean up function to reset everything
   const cleanupConnection = useCallback(() => {
     console.log("Cleaning up WebRTC connection");
     
-    // Close data channel
-    if (dataChannel) {
+    // Close data channel - use ref to avoid stale closures
+    if (dataChannelRef.current) {
       try {
-        console.log(`Closing data channel with state: ${dataChannel.readyState}`);
-        if (dataChannel.readyState === 'open' || dataChannel.readyState === 'connecting') {
-          dataChannel.close();
+        console.log(`Closing data channel with state: ${dataChannelRef.current.readyState}`);
+        if (dataChannelRef.current.readyState === 'open' || dataChannelRef.current.readyState === 'connecting') {
+          dataChannelRef.current.close();
         }
       } catch (err) {
         console.error("Error closing data channel:", err);
       }
+      dataChannelRef.current = null;
     }
     
     // Close peer connection
@@ -83,14 +114,17 @@ export function useWebRTC(signalingUrl: string) {
     }
     
     // Reset state
+    dataChannelRef.current = null; // Update ref
     setDataChannel(null);
     setConnectionState(ConnectionState.DISCONNECTED);
     fileChunks.current = [];
     currentFileInfo.current = null;
     bytesReceived.current = 0;
+    hasRemotePeer.current = false; // Reset remote peer tracking
+    pendingCandidates.current = []; // Clear pending candidates
     
     console.log("Connection cleanup complete");
-  }, [dataChannel]);
+  }, []); // No dependencies - uses refs which are always current
 
   // Initialize WebRTC peer connection
   const initPeerConnection = useCallback(() => {
@@ -126,20 +160,24 @@ export function useWebRTC(signalingUrl: string) {
         if (event.candidate) {
           console.log("ICE candidate generated:", event.candidate.candidate ? event.candidate.candidate.substr(0, 50) + '...' : 'empty');
           
+          const candidateMessage = {
+            type: 'candidate',
+            candidate: event.candidate,
+            connectionId: connectionIdRef.current // Use ref instead of state
+          };
+          
           if (signalingConnection.current?.readyState === WebSocket.OPEN) {
             try {
-              signalingConnection.current.send(JSON.stringify({
-                type: 'candidate',
-                candidate: event.candidate,
-                connectionId: connectionId
-              }));
+              signalingConnection.current.send(JSON.stringify(candidateMessage));
               console.log("ICE candidate sent to signaling server");
             } catch (err) {
               console.error('Error sending ICE candidate:', err);
-              setError('Failed to send ICE candidate');
+              // Queue for later
+              pendingCandidates.current.push(event.candidate);
             }
           } else {
-            console.warn('Signaling connection not open, cannot send ICE candidate');
+            console.warn('Signaling connection not open, queuing ICE candidate');
+            pendingCandidates.current.push(event.candidate);
           }
         } else {
           console.log("ICE candidate gathering complete");
@@ -153,7 +191,7 @@ export function useWebRTC(signalingUrl: string) {
 
       // Track connection state changes
       pc.oniceconnectionstatechange = () => {
-        console.log('ICE connection state changed to:', pc.iceConnectionState);
+        console.log('ICE connection state changed to:', pc.iceConnectionState, '| hasRemotePeer:', hasRemotePeer.current);
         
         switch (pc.iceConnectionState) {
           case 'checking':
@@ -163,25 +201,36 @@ export function useWebRTC(signalingUrl: string) {
           case 'completed':
             console.log("ICE connected/completed - connection established");
             setConnectionState(ConnectionState.CONNECTED);
+            setError(null); // Clear any previous errors
             break;
           case 'failed':
-            console.log("ICE failed - connection attempt failed");
-            setConnectionState(ConnectionState.FAILED);
-            setError('Connection failed - please check your connection and try again');
+            // Only mark as failed if we actually have a remote peer
+            // If no remote peer yet, this is just ICE gathering timeout - not a real failure
+            if (hasRemotePeer.current) {
+              console.log("ICE failed with remote peer - connection attempt failed");
+              setTimeout(() => {
+                if (pc.iceConnectionState === 'failed') {
+                  console.log("ICE still failed after timeout, marking as FAILED");
+                  setConnectionState(ConnectionState.FAILED);
+                  setError('Connection failed - please check your connection and try again');
+                }
+              }, 3000);
+            } else {
+              console.log("ICE failed but no remote peer yet - waiting for peer to join");
+              // Don't set error - we're still waiting for the peer
+            }
             break;
           case 'disconnected':
             console.log("ICE disconnected - connection may recover automatically");
             // Don't change state to DISCONNECTED yet, as it might recover
             // Set a timeout to change state if it doesn't recover
-            const disconnectTimeout = setTimeout(() => {
+            setTimeout(() => {
               if (pc.iceConnectionState === 'disconnected') {
                 console.log("ICE still disconnected after timeout, marking as DISCONNECTED");
                 setConnectionState(ConnectionState.DISCONNECTED);
               }
             }, 5000); // 5 second recovery window
-            
-            // Clear the timeout if component unmounts
-            return () => clearTimeout(disconnectTimeout);
+            break;
           case 'closed':
             console.log("ICE closed - connection terminated");
             setConnectionState(ConnectionState.DISCONNECTED);
@@ -194,17 +243,28 @@ export function useWebRTC(signalingUrl: string) {
       
       // Track connection state (newer API)
       pc.onconnectionstatechange = () => {
-        console.log('Connection state changed to:', pc.connectionState);
+        console.log('Connection state changed to:', pc.connectionState, '| hasRemotePeer:', hasRemotePeer.current);
         
         switch (pc.connectionState) {
           case 'connected':
             console.log("Connection established");
             setConnectionState(ConnectionState.CONNECTED);
+            setError(null); // Clear any previous errors
             break;
           case 'failed':
-            console.log("Connection failed");
-            setConnectionState(ConnectionState.FAILED);
-            setError('Connection failed - please check your connection and try again');
+            // Only mark as failed if we have a remote peer
+            if (hasRemotePeer.current) {
+              console.log("Connection failed with remote peer - checking if it recovers");
+              setTimeout(() => {
+                if (pc.connectionState === 'failed') {
+                  console.log("Connection still failed after timeout");
+                  setConnectionState(ConnectionState.FAILED);
+                  setError('Connection failed - please check your connection and try again');
+                }
+              }, 3000);
+            } else {
+              console.log("Connection state 'failed' but no remote peer yet - ignoring");
+            }
             break;
           case 'closed':
             console.log("Connection closed");
@@ -217,7 +277,10 @@ export function useWebRTC(signalingUrl: string) {
       pc.ondatachannel = (event) => {
         console.log("Data channel received from remote peer:", event.channel.label);
         const channel = event.channel;
-        setupDataChannel(channel);
+        // Use ref to get the current setupDataChannel function (avoids stale closure)
+        if (setupDataChannelRef.current) {
+          setupDataChannelRef.current(channel);
+        }
       };
 
       console.log("Peer connection initialized successfully");
@@ -228,7 +291,7 @@ export function useWebRTC(signalingUrl: string) {
       setError(`Failed to create peer connection: ${error.message || 'Unknown error'}`);
       return null;
     }
-  }, [connectionId]);
+  }, []); // No dependencies - uses refs which are always current
 
   // Set up and configure the data channel
   const setupDataChannel = useCallback((channel: RTCDataChannel) => {
@@ -237,18 +300,34 @@ export function useWebRTC(signalingUrl: string) {
     channel.onopen = () => {
       console.log('Data channel is open');
       setConnectionState(ConnectionState.CONNECTED);
+      dataChannelRef.current = channel; // Update ref
       setDataChannel(channel);
     };
 
     channel.onclose = () => {
       console.log('Data channel closed');
       setConnectionState(ConnectionState.DISCONNECTED);
+      dataChannelRef.current = null; // Update ref
       setDataChannel(null);
     };
 
-    channel.onerror = (event) => {
-      console.error('Data channel error:', event);
-      setError('Data channel error occurred');
+    channel.onerror = (event: Event) => {
+      // RTCErrorEvent has an error property, but it may not be present in all browsers
+      const rtcEvent = event as RTCErrorEvent;
+      
+      // Check if this is an actual error with details
+      if (rtcEvent.error && rtcEvent.error.message) {
+        const errorMessage = rtcEvent.error.message;
+        console.warn('Data channel error:', errorMessage);
+        // Only set error state for critical errors
+        if (errorMessage.toLowerCase().includes('fatal') || 
+            errorMessage.toLowerCase().includes('failed')) {
+          setError(`Data channel error: ${errorMessage}`);
+        }
+      } else {
+        // Non-fatal or browser-specific event, just log for debugging
+        console.log('Data channel event:', event.type, '(non-critical)');
+      }
     };
 
     // Handle incoming file data
@@ -299,6 +378,9 @@ export function useWebRTC(signalingUrl: string) {
     return channel;
   }, []);
 
+  // Store setupDataChannel in ref so initPeerConnection can access it
+  setupDataChannelRef.current = setupDataChannel;
+
   // Reconstruct and save the received file
   const finalizeFileTransfer = useCallback(() => {
     if (!currentFileInfo.current || fileChunks.current.length === 0) {
@@ -343,7 +425,7 @@ export function useWebRTC(signalingUrl: string) {
   // Connect to the signaling server
   const connectToSignalingServer = useCallback(() => {
     try {
-      console.log(`Connecting to signaling server at ${signalingUrl} with ID: ${connectionId}`);
+      console.log(`Connecting to signaling server at ${signalingUrl} with ID: ${connectionIdRef.current}`);
       
       // Close existing connection if any
       if (signalingConnection.current && signalingConnection.current.readyState === WebSocket.OPEN) {
@@ -357,19 +439,8 @@ export function useWebRTC(signalingUrl: string) {
       ws.onopen = () => {
         console.log('Connected to signaling server');
         setConnectionState(ConnectionState.CONNECTING);
-        
-        // If we already have a connection ID, send a join message
-        if (connectionId) {
-          console.log(`Sending join message for ID: ${connectionId}`);
-          try {
-            ws.send(JSON.stringify({
-              type: 'join',
-              connectionId: connectionId
-            }));
-          } catch (err) {
-            console.error('Error sending join message:', err);
-          }
-        }
+        // Note: Don't send join/register here - let createConnection or joinConnection handle it
+        // This prevents duplicate messages and ensures proper registration vs join flow
       };
 
       ws.onclose = () => {
@@ -399,19 +470,46 @@ export function useWebRTC(signalingUrl: string) {
           }
           
           // Only process messages for our connection ID
-          if (message.connectionId && message.connectionId !== connectionId && 
-              connectionId !== null) {
+          if (message.connectionId && message.connectionId !== connectionIdRef.current && 
+              connectionIdRef.current !== null) {
             console.log(`Ignoring message for different connection ID: ${message.connectionId}`);
             return;
           }
 
           if (message.type === 'joined' || message.type === 'registered') {
             console.log(`Connection ${message.type} with ID: ${message.connectionId}`);
+            // Flush any pending ICE candidates after registration confirmation
+            flushPendingCandidates();
+            return;
+          }
+
+          // Handle peer-joined (receiver joined, sender should resend offer)
+          if (message.type === 'peer-joined') {
+            console.log('Peer joined the connection, resending offer if we are the sender');
+            // Resend offer if we have a peer connection with local description
+            if (peerConnection.current && peerConnection.current.localDescription) {
+              console.log('Resending existing offer to new peer');
+              ws.send(JSON.stringify({
+                type: 'offer',
+                offer: peerConnection.current.localDescription,
+                connectionId: connectionIdRef.current
+              }));
+              // Also flush any pending candidates
+              flushPendingCandidates();
+            }
+            return;
+          }
+
+          // Handle peer-disconnected
+          if (message.type === 'peer-disconnected') {
+            console.log('Peer disconnected from the connection');
+            // Optionally handle peer disconnection
             return;
           }
 
           if (message.type === 'offer' && peerConnection.current) {
-            console.log('Processing offer');
+            console.log('Processing offer - setting hasRemotePeer = true');
+            hasRemotePeer.current = true; // We now have a remote peer
             
             try {
               await peerConnection.current.setRemoteDescription(new RTCSessionDescription(message.offer));
@@ -422,7 +520,7 @@ export function useWebRTC(signalingUrl: string) {
               ws.send(JSON.stringify({
                 type: 'answer',
                 answer: answer,
-                connectionId: connectionId
+                connectionId: connectionIdRef.current
               }));
             } catch (err) {
               const error = err as Error;
@@ -431,10 +529,12 @@ export function useWebRTC(signalingUrl: string) {
             }
           }
           else if (message.type === 'answer' && peerConnection.current) {
-            console.log('Processing answer');
+            console.log('Processing answer - setting hasRemotePeer = true');
+            hasRemotePeer.current = true; // We now have a remote peer
+            
             try {
               await peerConnection.current.setRemoteDescription(new RTCSessionDescription(message.answer));
-              console.log('Set remote description from answer');
+              console.log('Set remote description from answer - connection should establish now');
             } catch (err) {
               const error = err as Error;
               console.error('Error setting remote description from answer:', error);
@@ -474,18 +574,18 @@ export function useWebRTC(signalingUrl: string) {
       setError(`Failed to connect to signaling server: ${error.message}`);
       return null;
     }
-  }, [connectionId, connectionState]);
+  }, [signalingUrl, flushPendingCandidates]);
 
   // Create a connection as initiator (sender)
   const createConnection = useCallback(async () => {
     try {
-      if (!connectionId) {
+      if (!connectionIdRef.current) {
         console.error("Cannot create connection without connectionId");
         setError("Connection ID is required");
         return false;
       }
       
-      console.log(`Creating connection as initiator with ID: ${connectionId}`);
+      console.log(`Creating connection as initiator with ID: ${connectionIdRef.current}`);
       setConnectionState(ConnectionState.CONNECTING);
       setError(null);
       
@@ -531,7 +631,7 @@ export function useWebRTC(signalingUrl: string) {
       console.log("Sending register message");
       signalingConnection.current?.send(JSON.stringify({
         type: 'register',
-        connectionId: connectionId
+        connectionId: connectionIdRef.current
       }));
 
       // Create data channel
@@ -552,7 +652,7 @@ export function useWebRTC(signalingUrl: string) {
       signalingConnection.current?.send(JSON.stringify({
         type: 'offer',
         offer: offer,
-        connectionId: connectionId
+        connectionId: connectionIdRef.current
       }));
       
       console.log("Connection setup complete");
@@ -565,18 +665,18 @@ export function useWebRTC(signalingUrl: string) {
       cleanupConnection();
       return false;
     }
-  }, [cleanupConnection, connectToSignalingServer, connectionId, initPeerConnection, setupDataChannel]);
+  }, [cleanupConnection, connectToSignalingServer, initPeerConnection, setupDataChannel]);
 
   // Join an existing connection (receiver)
   const joinConnection = useCallback(async () => {
     try {
-      if (!connectionId) {
+      if (!connectionIdRef.current) {
         console.error("Cannot join connection without connectionId");
         setError('Connection ID is required to join a connection');
         return false;
       }
       
-      console.log(`Joining connection as receiver with ID: ${connectionId}`);
+      console.log(`Joining connection as receiver with ID: ${connectionIdRef.current}`);
       setConnectionState(ConnectionState.CONNECTING);
       setError(null);
       
@@ -622,7 +722,7 @@ export function useWebRTC(signalingUrl: string) {
       console.log("Sending join message to signaling server");
       signalingConnection.current?.send(JSON.stringify({
         type: 'join',
-        connectionId: connectionId
+        connectionId: connectionIdRef.current
       }));
       
       console.log("Join connection setup complete, waiting for offer");
@@ -635,70 +735,76 @@ export function useWebRTC(signalingUrl: string) {
       cleanupConnection();
       return false;
     }
-  }, [cleanupConnection, connectToSignalingServer, connectionId, initPeerConnection]);
+  }, [cleanupConnection, connectToSignalingServer, initPeerConnection]);
 
   // Send a file
-  const sendFile = useCallback((file: File) => {
-    if (!dataChannel || dataChannel.readyState !== 'open') {
-      setError('Data channel is not open');
-      return false;
-    }
+  const sendFile = useCallback((file: File): Promise<boolean> => {
+    return new Promise((resolve, reject) => {
+      if (!dataChannel || dataChannel.readyState !== 'open') {
+        setError('Data channel is not open');
+        reject(new Error('Data channel is not open'));
+        return;
+      }
 
-    try {
-      // Send file metadata first
-      const fileInfo = {
-        type: 'file-info',
-        name: file.name,
-        mimeType: file.type || 'application/octet-stream',
-        size: file.size
-      };
-      
-      dataChannel.send(JSON.stringify(fileInfo));
-      console.log(`Sending file: ${file.name}, size: ${file.size} bytes`);
-      
-      // Read and send file in chunks
-      const chunkSize = 16 * 1024; // 16 KB chunks
-      let offset = 0;
-      
-      const reader = new FileReader();
-      
-      reader.onload = (e) => {
-        if (e.target && e.target.result && dataChannel.readyState === 'open') {
-          dataChannel.send(e.target.result as ArrayBuffer);
-          
-          offset += chunkSize;
-          
-          if (offset < file.size) {
-            // Read the next chunk
-            readChunk();
-          } else {
-            // Signal completion
-            dataChannel.send(JSON.stringify({ type: 'file-complete' }));
-            console.log('File sent successfully');
+      try {
+        // Send file metadata first
+        const fileInfo = {
+          type: 'file-info',
+          name: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          size: file.size
+        };
+        
+        dataChannel.send(JSON.stringify(fileInfo));
+        console.log(`Sending file: ${file.name}, size: ${file.size} bytes`);
+        
+        // Read and send file in chunks
+        const chunkSize = 16 * 1024; // 16 KB chunks
+        let offset = 0;
+        
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+          if (e.target && e.target.result && dataChannel.readyState === 'open') {
+            dataChannel.send(e.target.result as ArrayBuffer);
+            
+            offset += chunkSize;
+            
+            if (offset < file.size) {
+              // Read the next chunk - use setTimeout to avoid blocking
+              setTimeout(readChunk, 0);
+            } else {
+              // Signal completion
+              dataChannel.send(JSON.stringify({ type: 'file-complete' }));
+              console.log('File sent successfully');
+              resolve(true);
+            }
+          } else if (dataChannel.readyState !== 'open') {
+            reject(new Error('Data channel closed during transfer'));
           }
-        }
-      };
-      
-      reader.onerror = (e) => {
-        console.error('Error reading file:', e);
-        setError('Error reading file');
-      };
-      
-      // Function to read chunks
-      const readChunk = () => {
-        const slice = file.slice(offset, offset + chunkSize);
-        reader.readAsArrayBuffer(slice);
-      };
-      
-      // Start reading
-      readChunk();
-      return true;
-    } catch (err) {
-      const error = err as Error;
-      console.error('Error sending file:', error);
-      setError(`Failed to send file: ${error.message || 'Unknown error'}`);
-      return false;
-    }
+        };
+        
+        reader.onerror = (e) => {
+          console.error('Error reading file:', e);
+          setError('Error reading file');
+          reject(new Error('Error reading file'));
+        };
+        
+        // Function to read chunks
+        const readChunk = () => {
+          const slice = file.slice(offset, offset + chunkSize);
+          reader.readAsArrayBuffer(slice);
+        };
+        
+        // Start reading
+        readChunk();
+      } catch (err) {
+        const error = err as Error;
+        console.error('Error sending file:', error);
+        setError(`Failed to send file: ${error.message || 'Unknown error'}`);
+        reject(error);
+      }
+    });
   }, [dataChannel]);
 
   // Close connection
@@ -720,7 +826,7 @@ export function useWebRTC(signalingUrl: string) {
     dataChannel,
     error,
     receivedFiles,
-    setConnectionId,
+    setConnectionId: updateConnectionId, // Use the wrapper that updates both state and ref
     createConnection,
     joinConnection,
     sendFile,
