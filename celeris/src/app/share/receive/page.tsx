@@ -33,6 +33,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { FileReceiver } from "@/lib/transferFile";
 import { useWebRTC } from "@/hooks/useWebRTC";
+import { Badge } from "@/components/ui/badge";
 
 // Define connection states for UI feedback
 enum ConnectionUIState {
@@ -87,7 +88,7 @@ function ReceiveContent() {
     setConnectionId: setWebRTCConnectionId,
     joinConnection,
     closeConnection
-  } = useWebRTC("ws://localhost:8080");
+  } = useWebRTC(process.env.NEXT_PUBLIC_SIGNALING_URL || "ws://localhost:8080");
   
   // Set mounted flag on client side only
   useEffect(() => {
@@ -397,7 +398,7 @@ function ReceiveContent() {
   const renderConnectionStatus = () => {
     switch (uiState) {
       case ConnectionUIState.IDLE:
-        return <span className="text-gray-400">Not connected</span>;
+        return <span className="text-foreground">Not connected</span>;
       case ConnectionUIState.JOINING:
       case ConnectionUIState.WAITING:
         return (
@@ -408,7 +409,7 @@ function ReceiveContent() {
         );
       case ConnectionUIState.CONNECTED:
         return (
-          <span className="text-green-400 flex items-center">
+          <span className="text-green-500 flex items-center">
             <CheckCircle className="h-4 w-4 mr-2" />
             Connected
           </span>
@@ -417,7 +418,7 @@ function ReceiveContent() {
         return <span className="text-blue-400">Receiving files...</span>;
       case ConnectionUIState.COMPLETE:
         return (
-          <span className="text-green-400 flex items-center">
+          <span className="text-green-500 flex items-center">
             <CheckCircle className="h-4 w-4 mr-2" />
             Transfer complete
           </span>
@@ -431,15 +432,6 @@ function ReceiveContent() {
         );
     }
   };
-
-  // Back button for navigation
-  const BackButton = () => (
-    <Link href="/">
-      <button className="p-2 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500">
-        <ChevronLeft />
-      </button>
-    </Link>
-  );
   
   // Prevent hydration errors by not rendering until mounted on client
   if (!isMounted) {
@@ -448,54 +440,59 @@ function ReceiveContent() {
   
   return (
     <>
-      <div className="p-4">
-        <BackButton />
-        <div className="min-h-[80dvh] flex flex-col items-center justify-center">
-          <BlurFade delay={0} className="items-center justify-center flex flex-col">
-            <h1 className="mont text-4xl font-bold">
-              Receive Files with <span className="yellowtail text-orange-400 text-5xl">Ease</span>
+      <div className="pt-20 px-4 md:px-0">
+        <div className="min-h-[10dvh] flex flex-col items-start sm:items-center justify-start sm:justify-center">
+          <BlurFade delay={0} className="items-center flex flex-col">
+            <h1 className="text-3xl sm:text-4xl font-bold text-center">
+              Receive Files with <span className="text-primary">Ease</span>
             </h1>
           </BlurFade>
-          <BlurFade delay={0.5}>
-            <span className="mont text-lg text-gray-400">
+          <BlurFade delay={0.5} className="items-center flex flex-col">
+            <span className="text-md sm:text-sm text-muted-foreground mt-2 sm:mt-1 text-center">
               Enter a connection ID or paste a link to start receiving files.
             </span>
           </BlurFade>
           
-          {/* Connection status indicator */}
-          <div className="w-full flex justify-center my-2">
-            {renderConnectionStatus()}
-          </div>
-          
-          <div className="relative flex flex-col items-center justify-center bg-[#252525] w-[100dvh] h-[50dvh] p-4 rounded-md mt-5">
+          <div className="w-full max-w-[102dvh] flex flex-col items-center justify-center">
+            {/* Connection status indicator */}
+            <div className="flex w-full items-center justify-end gap-2 my-2">
+              <Badge className={`bg-transparent ${uiState === ConnectionUIState.ERROR ? "bg-red-500/10" : "bg-green-500/10"} ${uiState === ConnectionUIState.ERROR ? "border-red-600" : "border-green-600"}`}>
+                <div className={`w-2 h-2 rounded-xl ${uiState === ConnectionUIState.ERROR ? "bg-red-500" : "bg-green-500"} animate-pulse`}/>
+                {renderConnectionStatus()}
+              </Badge>
+            </div>
+            <div className="relative flex flex-col items-center justify-center bg-border w-full h-[50dvh] sm:h-[55dvh] md:h-[60dvh] p-4 rounded-md my-2 overflow-hidden">
             {receivedFiles.length > 0 ? (
               <div className="scrollBar w-full h-[70vh] overflow-y-auto">
                 <Table className="w-full">
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-[70dvh]">File Name</TableHead>
-                      <TableHead className="w-[15dvh]">Size</TableHead>
-                      <TableHead className="w-[15dvh]">Action</TableHead>
+                      <TableHead className="w-[50%] sm:w-[60%]">File Name</TableHead>
+                      <TableHead className="hidden sm:table-cell w-[20%]">Size</TableHead>
+                      <TableHead className="w-[50%] sm:w-[20%] text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {receivedFiles.map((file: File, index: number) => (
                       <TableRow key={index} className="hover:bg-[#303030]">
-                        <TableCell className="font-medium mont text-orange-400">
-                          {file.name}
+                        <TableCell className="font-medium text-primary">
+                          <div className="flex flex-col">
+                            <span className="truncate max-w-[150px] sm:max-w-none">{file.name}</span>
+                            <span className="text-xs text-muted-foreground sm:hidden">{formatFileSize(file.size)}</span>
+                          </div>
                         </TableCell>
-                        <TableCell className="text-xs mont">
+                        <TableCell className="hidden sm:table-cell text-xs text-muted-foreground">
                           {formatFileSize(file.size)}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-right">
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="flex items-center gap-1 hover:bg-orange-500/20 hover:text-orange-400"
+                            className="flex items-center gap-1 text-muted-foreground transition-all ease-in-out duration-300 hover:bg-transparent hover:text-primary"
                             onClick={() => saveFile(file)}
                           >
                             <Download className="h-4 w-4" />
-                            <span className="text-xs">Save</span>
+                            <span className="text-xs hidden sm:inline">Save</span>
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -506,13 +503,13 @@ function ReceiveContent() {
             ) : (
               <div className="flex flex-col items-center justify-center h-full">
                 {uiState === ConnectionUIState.IDLE ? (
-                  <div className="text-center">
-                    <FileIcon className="w-16 h-16 text-gray-500 mx-auto mb-4" />
-                    <p className="mont text-gray-400 mb-6">
+                  <div className="text-center px-4">
+                    <FileIcon className="w-12 h-12 sm:w-16 sm:h-16 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-sm sm:text-base text-muted-foreground mb-6">
                       No files received yet. Connect to start receiving files.
                     </p>
                     <Button 
-                      className="mont font-bold bg-orange-500 hover:bg-orange-600 mb-4"
+                      className="font-bold bg-primary hover:bg-primary/80 mb-4 w-full sm:w-auto"
                       onClick={() => setConnectDialogOpen(true)}
                     >
                       <LinkIcon className="w-4 h-4 mr-2" />
@@ -520,26 +517,26 @@ function ReceiveContent() {
                     </Button>
                   </div>
                 ) : uiState === ConnectionUIState.JOINING || uiState === ConnectionUIState.WAITING ? (
-                  <div className="text-center">
-                    <RefreshCw className="w-16 h-16 text-orange-400 mx-auto mb-4 animate-spin" />
-                    <p className="mont text-gray-300 mb-2">
+                  <div className="text-center px-4">
+                    <RefreshCw className="w-12 h-12 sm:w-16 sm:h-16 text-primary mx-auto mb-4 animate-spin" />
+                    <p className="text-sm sm:text-base text-primary mb-2">
                       {uiState === ConnectionUIState.JOINING ? "Joining connection..." : "Waiting for sender..."}
                     </p>
-                    <p className="mont text-gray-500 text-sm">
+                    <p className="text-gray-500 text-xs sm:text-sm break-all">
                       Connection ID: {connectionId}
                     </p>
                   </div>
                 ) : uiState === ConnectionUIState.ERROR ? (
-                  <div className="text-center">
-                    <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-                    <p className="mont text-red-400 mb-2">
+                  <div className="text-center px-4">
+                    <AlertTriangle className="w-12 h-12 sm:w-16 sm:h-16 text-red-500 mx-auto mb-4" />
+                    <p className="text-sm sm:text-base text-red-400 mb-2">
                       Connection Error
                     </p>
-                    <p className="mont text-gray-400 text-sm mb-6">
+                    <p className="text-gray-400 text-xs sm:text-sm mb-6">
                       {error || "Failed to establish connection. Please try again."}
                     </p>
                     <Button 
-                      className="mont font-bold bg-orange-500 hover:bg-orange-600"
+                      className="font-bold bg-primary hover:bg-primary w-full sm:w-auto"
                       onClick={startNewSession}
                     >
                       <RefreshCw className="w-4 h-4 mr-2" />
@@ -547,12 +544,12 @@ function ReceiveContent() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="text-center">
-                    <Upload className="w-16 h-16 text-orange-400 mx-auto mb-4" />
-                    <p className="mont text-gray-300 mb-2">
+                  <div className="text-center px-4">
+                    <Upload className="w-12 h-12 sm:w-16 sm:h-16 text-primary mx-auto mb-4" />
+                    <p className="text-sm sm:text-base text-gray-300 mb-2">
                       Ready to receive files
                     </p>
-                    <p className="mont text-gray-500 text-sm">
+                    <p className="text-gray-500 text-xs sm:text-sm">
                       Waiting for sender to transfer files...
                     </p>
                   </div>
@@ -567,15 +564,17 @@ function ReceiveContent() {
               colorTo="#fcbb7e"
             />
           </div>
+          </div>
+          
           
           {/* Action buttons */}
-          <div className="flex flex-col sm:flex-row gap-2 mt-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mt-5 w-full sm:w-auto">
             {receivedFiles.length > 0 && (
               <Button 
-                className="mont font-bold transition-all ease-in-out hover:bg-orange-500"
+                className="font-bold transition-all ease-in-out hover:bg-primary w-full sm:w-auto flex items-center justify-center"
                 onClick={saveAllFiles}
               >
-                Download All <Download className="w-5 ml-2" />
+                <Download className="w-5 mr-2" />Download All
               </Button>
             )}
             
@@ -584,7 +583,7 @@ function ReceiveContent() {
               uiState === ConnectionUIState.COMPLETE) && (
               <Button 
                 variant="outline" 
-                className="mont font-bold transition-all ease-in-out"
+                className="font-bold transition-all ease-in-out w-full sm:w-auto"
                 onClick={startNewSession}
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
@@ -594,7 +593,7 @@ function ReceiveContent() {
             
             {(uiState === ConnectionUIState.IDLE || uiState === ConnectionUIState.ERROR) && (
               <Button 
-                className="mont font-bold transition-all ease-in-out hover:bg-orange-500"
+                className="font-bold transition-all ease-in-out duration-200 hover:bg-primary/70 w-full sm:w-auto"
                 onClick={() => setConnectDialogOpen(true)}
               >
                 <LinkIcon className="w-4 h-4 mr-2" />
@@ -607,12 +606,12 @@ function ReceiveContent() {
 
       {/* Connection dialog */}
       <Dialog open={isConnectDialogOpen} onOpenChange={setConnectDialogOpen}>
-        <DialogContent className="bg-[#1d1d1d] text-white border-none">
+        <DialogContent className="sm:max-w-xl w-full bg-background text-foreground border-none p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="mont text-lg font-bold">
-              Enter Connection ID
+            <DialogTitle className="text-foreground">
+              <span className="text-lg font-bold">Enter Connection ID</span>
             </DialogTitle>
-            <DialogDescription className="mont text-gray-400 text-sm">
+            <DialogDescription className="text-muted-foreground text-sm mt-2">
               Enter the connection ID or paste the link provided by the sender.
             </DialogDescription>
           </DialogHeader>
@@ -620,7 +619,7 @@ function ReceiveContent() {
           <div className="space-y-4 my-2">
             <Input
               placeholder="Connection ID or full link"
-              className="bg-[#252525] border-gray-700 text-white mont focus-visible:ring-orange-500"
+              className="bg-muted/20 border-muted text-foreground focus-visible:ring-primary"
               value={connectionIdInput}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                 const value = e.target.value;
@@ -640,15 +639,16 @@ function ReceiveContent() {
             />
           </div>
           
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="ghost"
               onClick={() => setConnectDialogOpen(false)}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
             <Button
-              className="mont font-bold bg-orange-500 hover:bg-orange-600"
+              className="font-bold bg-primary hover:bg-primary/80 text-white w-full sm:w-auto"
               onClick={() => handleConnect()}
               disabled={!connectionIdInput.trim()}
             >
@@ -660,43 +660,43 @@ function ReceiveContent() {
       
       {/* Connection status dialog */}
       <Dialog open={isStatusDialogOpen} onOpenChange={setStatusDialogOpen}>
-        <DialogContent className="bg-[#1d1d1d] text-white border-none">
+        <DialogContent className="sm:max-w-xl w-full bg-background text-foreground border-none p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="mont text-lg font-bold">
-              Connection Established
+            <DialogTitle className="text-foreground">
+              <span className="text-lg font-bold">Connection <span className="text-primary">Established</span></span>
             </DialogTitle>
-            <DialogDescription className="mont text-gray-400 text-sm">
+            <DialogDescription className="text-muted-foreground text-sm mt-2">
               You are now connected to the sender. Waiting for files...
             </DialogDescription>
           </DialogHeader>
           
-          <div className="bg-black/30 rounded-md p-3 mb-4">
-            <h3 className="font-medium text-sm mb-1">Connection Info</h3>
-            <div className="flex justify-between items-center">
-              <div className="text-sm flex items-center gap-2">
-                <span className="text-gray-400">ID:</span>
-                <code className="bg-black/30 px-2 py-1 rounded text-orange-400">
+          <div className="bg-border rounded-md p-3 mb-4">
+            <h3 className="font-medium text-sm mb-2">Connection Info</h3>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+              <div className="text-xs sm:text-sm flex items-center gap-2 flex-wrap">
+                <span className="text-muted-foreground">ID:</span>
+                <code className="bg-foreground/20 px-2 py-1 rounded text-primary break-all">
                   {connectionId}
                 </code>
                 <button 
-                  className="text-gray-400 hover:text-white"
+                  className="text-muted-foreground hover:text-foreground"
                   onClick={() => navigator.clipboard.writeText(connectionId)}
                 >
                   <Copy className="h-3 w-3" />
                 </button>
               </div>
-              <div className="text-green-400 flex items-center">
+              <div className="text-green-500 flex items-center text-sm">
                 <CheckCircle className="h-4 w-4 mr-1" />
                 Connected
               </div>
             </div>
           </div>
           
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="destructive"
               onClick={handleDisconnect}
-              className="mont"
+              className="w-full sm:w-auto"
             >
               <X className="h-4 w-4 mr-2" />
               Disconnect

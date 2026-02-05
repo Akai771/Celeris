@@ -1,10 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useDropzone } from "react-dropzone";
-import Link from "next/link";
 import { 
-  ChevronLeft, 
   Trash2, 
   Rocket, 
   Facebook, 
@@ -20,7 +18,8 @@ import {
   Copy,
   CheckCircle,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  Trash,
 } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
 import { BsTwitterX } from "react-icons/bs";
@@ -33,8 +32,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { FaRegFilePdf } from "react-icons/fa6";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useWebRTC } from "@/hooks/useWebRTC";
-import { transferFile } from "@/lib/transferFile";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 
 // Define connection states for UI feedback
 enum ConnectionUIState {
@@ -183,7 +182,7 @@ function TransferContent() {
     sendFile,
     error: webRTCError,
     closeConnection
-  } = useWebRTC("ws://localhost:8080");
+  } = useWebRTC(process.env.NEXT_PUBLIC_SIGNALING_URL || "ws://localhost:8080");
   
   // Set mounted flag on client side only
   useEffect(() => {
@@ -456,35 +455,26 @@ function TransferContent() {
     setModalOpen(false);
   };
 
-  // Navigation back button
-  const BackButton = () => (
-    <Link href="/">
-      <button className="p-2 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500">
-        <ChevronLeft />
-      </button>
-    </Link>
-  );
-
   const totalSize = getTotalFileSize(files);
 
   // Render connection status indicator
   const renderConnectionStatus = () => {
     switch (uiState) {
       case ConnectionUIState.IDLE:
-        return <span className="text-gray-400">Not connected</span>;
+        return <span className="text-muted-foreground">Not connected</span>;
       case ConnectionUIState.CREATING:
       case ConnectionUIState.CONNECTING:
         return (
-          <span className="text-yellow-400 flex items-center">
+          <span className="text-amber-500 flex items-center">
             <RefreshCw className="animate-spin h-4 w-4 mr-2" />
             Establishing connection...
           </span>
         );
       case ConnectionUIState.READY:
-        return <span className="text-yellow-400">Waiting for peer...</span>;
+        return <span className="text-amber-500">Waiting for peer...</span>;
       case ConnectionUIState.CONNECTED:
         return (
-          <span className="text-green-400 flex items-center">
+          <span className="text-green-500 flex items-center">
             <CheckCircle className="h-4 w-4 mr-2" />
             Connected
           </span>
@@ -493,7 +483,7 @@ function TransferContent() {
         return <span className="text-blue-400">Transferring files...</span>;
       case ConnectionUIState.COMPLETE:
         return (
-          <span className="text-green-400 flex items-center">
+          <span className="text-green-500 flex items-center">
             <CheckCircle className="h-4 w-4 mr-2" />
             Transfer complete
           </span>
@@ -515,103 +505,108 @@ function TransferContent() {
 
   return (
     <>
-      <div className="p-4">
-        <BackButton />
-
+      <div className="pt-20 px-4 md:px-0">
         <div className="min-h-[10dvh] flex flex-col items-start sm:items-center justify-start sm:justify-center">
-          <BlurFade delay={0} className="items-start sm:items-center flex flex-col sm:text-center">
-            <h1 className="mont text-3xl sm:text-4xl font-bold">
-              Transfer Files <span className="yellowtail text-orange-400">Effortlessly</span>
+          <BlurFade delay={0} className="items-center flex flex-col">
+            <h1 className="text-3xl sm:text-4xl font-bold text-center">
+              Transfer Files <span className="text-primary">Effortlessly</span>
             </h1>
           </BlurFade>
 
-          <BlurFade delay={0.5}>
-            <span className="mont text-base sm:text-lg text-gray-400 mt-2 sm:mt-1">
+          <BlurFade delay={0.5} className="items-center flex flex-col">
+            <span className="text-md sm:text-sm text-muted-foreground mt-2 sm:mt-1 text-center">
               Upload files to generate a secure link for direct sharing.
             </span>
           </BlurFade>
           
-          {/* Connection status indicator */}
-          <div className="w-full flex justify-center my-2">
-            {renderConnectionStatus()}
+
+          <div className="w-full max-w-[102dvh] flex flex-col items-center justify-center">
+            {/* Connection status indicator */}
+            <div className="flex w-full items-center justify-end gap-2 my-2">
+              <Badge className={`bg-transparent ${uiState === ConnectionUIState.CONNECTED ? "bg-green-500/10" : "bg-red-500/10"} ${uiState === ConnectionUIState.CONNECTED ? "border-green-600" : "border-red-600"}`}>
+                <div className={`w-2 h-2 rounded-xl ${uiState === ConnectionUIState.CONNECTED ? "bg-green-500" : "bg-red-500"} animate-pulse`}/>
+                {renderConnectionStatus()}
+              </Badge>
+            </div>
+            
+            <div
+              {...getRootProps()}
+              className="relative px-4 rounded-md w-full h-[60dvh] bg-border flex items-center justify-center cursor-pointer overflow-hidden"
+            >
+              <input {...getInputProps()} />
+              {!files.length ? (
+                <p className="text-stone-500 text-center px-2">
+                  Drag &amp; drop files here, or click to select files
+                </p>
+              ) : (
+                <ScrollArea className="h-[53dvh] w-[100dvh] rounded-md">
+                  <div className="flex flex-wrap gap-4 justify-start mt-5 px-2">
+                    {files.map((file, i) => (
+                      <div
+                        key={i}
+                        className="relative flex flex-col items-center justify-center w-36 sm:w-40 h-36 sm:h-40 bg-border rounded-md p-2 hover:bg-[#3a3a3a] transition duration-200 group"
+                      >
+                        <div className="w-24 sm:w-28 h-24 sm:h-28 flex items-center justify-center mt-1 rounded overflow-hidden">
+                          <FilePreview file={file} />
+                        </div>
+                        <p
+                          className="text-xs sm:text-sm text-gray-400 text-center mt-1 truncate w-full"
+                          title={file.name}
+                        >
+                          {file.name}
+                        </p>
+                        <div className="absolute bottom-1 left-1 bg-black bg-opacity-70 px-2 py-1 rounded text-xs text-white opacity-0 group-hover:opacity-100 transition duration-200">
+                          {formatFileSize(file.size)}
+                        </div>
+                        
+                        {/* Show transfer progress */}
+                        {transferProgress[file.name] !== undefined && (
+                          <div className="absolute bottom-1 right-1 left-1 px-2">
+                            <Progress 
+                              value={transferProgress[file.name]} 
+                              className="h-1" 
+                              color={
+                                transferComplete.includes(file.name) 
+                                  ? "bg-green-500" 
+                                  : "bg-orange-400"
+                              }
+                            />
+                          </div>
+                        )}
+                        
+                        {/* Transfer status icon */}
+                        {transferComplete.includes(file.name) ? (
+                          <div className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded-full transition duration-200 flex items-center gap-1 text-xs sm:text-sm">
+                            <CheckCircle size={16} />
+                            <span>Sent</span>
+                          </div>
+                        ) : (
+                          <button
+                            className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition duration-200 flex items-center gap-1 text-xs sm:text-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveFile(file);
+                            }}
+                          >
+                            <Trash2 size={16} />
+                            <span>Delete</span>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+              <BorderBeam
+                size={150}
+                duration={10}
+                className="z-40"
+                colorFrom="#ff7b00"
+                colorTo="#fcbb7e"
+              />
+            </div>
           </div>
           
-          <div
-            {...getRootProps()}
-            className="relative px-4 rounded-md w-full max-w-[102dvh] h-[60dvh] bg-[#252525] flex items-center justify-center cursor-pointer"
-          >
-            <input {...getInputProps()} />
-            {!files.length ? (
-              <p className="mont text-stone-500 text-center px-2">
-                Drag &amp; drop files here, or click to select files
-              </p>
-            ) : (
-              <ScrollArea className="h-[53dvh] w-[100dvh] rounded-md">
-                <div className="flex flex-wrap gap-4 justify-start mt-5 px-2">
-                  {files.map((file, i) => (
-                    <div
-                      key={i}
-                      className="relative flex flex-col items-center justify-center w-36 sm:w-40 h-36 sm:h-40 bg-[#2d2d2d] rounded-md p-2 hover:bg-[#3a3a3a] transition duration-200 group"
-                    >
-                      <div className="w-24 sm:w-28 h-24 sm:h-28 flex items-center justify-center mt-1 rounded overflow-hidden">
-                        <FilePreview file={file} />
-                      </div>
-                      <p
-                        className="text-xs sm:text-sm text-gray-400 text-center mt-1 truncate w-full"
-                        title={file.name}
-                      >
-                        {file.name}
-                      </p>
-                      <div className="absolute bottom-1 left-1 bg-black bg-opacity-70 px-2 py-1 rounded text-xs text-white opacity-0 group-hover:opacity-100 transition duration-200">
-                        {formatFileSize(file.size)}
-                      </div>
-                      
-                      {/* Show transfer progress */}
-                      {transferProgress[file.name] !== undefined && (
-                        <div className="absolute bottom-1 right-1 left-1 px-2">
-                          <Progress 
-                            value={transferProgress[file.name]} 
-                            className="h-1" 
-                            color={
-                              transferComplete.includes(file.name) 
-                                ? "bg-green-500" 
-                                : "bg-orange-400"
-                            }
-                          />
-                        </div>
-                      )}
-                      
-                      {/* Transfer status icon */}
-                      {transferComplete.includes(file.name) ? (
-                        <div className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded-full transition duration-200 flex items-center gap-1 text-xs sm:text-sm">
-                          <CheckCircle size={16} />
-                          <span>Sent</span>
-                        </div>
-                      ) : (
-                        <button
-                          className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition duration-200 flex items-center gap-1 text-xs sm:text-sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveFile(file);
-                          }}
-                        >
-                          <Trash2 size={16} />
-                          <span>Delete</span>
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
-            <BorderBeam
-              size={150}
-              duration={10}
-              className="z-40"
-              colorFrom="#ff7b00"
-              colorTo="#fcbb7e"
-            />
-          </div>
           <div className="flex flex-col items-start sm:items-center gap-3 mt-5 w-full sm:w-auto">
             {!!files.length && (
               <div className="flex items-center gap-2 rounded-lg bg-gray-800/50 px-3 py-2 text-sm w-full sm:w-auto">
@@ -637,19 +632,19 @@ function TransferContent() {
             )}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
               <Button
-                className="mont font-bold hover:bg-orange-500 transition-all ease-in-out w-full sm:w-auto flex items-center justify-center"
+                className="font-bold hover:bg-primary/70 transition-all ease-in-out duration-200 w-full sm:w-auto flex items-center justify-center"
                 onClick={toggleModal}
                 disabled={uiState === ConnectionUIState.CREATING || uiState === ConnectionUIState.CONNECTING}
               >
-                Transfer <Rocket className="w-5 ml-2" />
+                <Rocket className="w-5" />Transfer
               </Button>
               {!!files.length && (
                 <Button
                   variant="destructive"
-                  className="mont font-bold transition-all ease-in-out w-full sm:w-auto"
+                  className="font-bold transition-all ease-in-out duration-200 w-full sm:w-auto"
                   onClick={handleRemoveAllFiles}
                 >
-                  Remove All
+                  <Trash className="w-5" />Remove All 
                 </Button>
               )}
             </div>
@@ -658,20 +653,20 @@ function TransferContent() {
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={toggleModal}>
-        <DialogContent className="sm:max-w-xl w-full bg-[#1d1d1d] text-white border-none p-4 sm:p-6">
+        <DialogContent className="sm:max-w-xl w-full bg-background text-foreground border-none p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="text-white">
-              <span className="mont text-lg font-bold">
-                Your link is <span className="yellowtail text-orange-400 text-2xl">ready</span>
+            <DialogTitle className="text-foreground">
+              <span className="text-lg font-bold">
+                Your link is <span className="text-primary">ready</span>
               </span>
             </DialogTitle>
-            <DialogDescription className="mont text-gray-400 text-sm mt-2">
+            <DialogDescription className="text-muted-foreground text-sm mt-2">
               Copy, scan, or share this link to start transferring files.
             </DialogDescription>
           </DialogHeader>
           
           {/* Current connection status */}
-          <div className="bg-black/30 rounded-md p-3 mb-4">
+          <div className="bg-border rounded-md p-3 mb-4">
             <h3 className="font-medium text-sm mb-1">Connection Status</h3>
             <div className="flex justify-between items-center">
               <div>{renderConnectionStatus()}</div>
@@ -679,16 +674,16 @@ function TransferContent() {
                 variant="outline" 
                 size="sm" 
                 onClick={resetConnection}
-                className="text-xs"
+                className="text-xs text-white transition-all ease-in-out duration-300 bg-primary hover:bg-primary/80 flex items-center"
               >
                 <RefreshCw className="mr-1 h-3 w-3" /> Reset
               </Button>
             </div>
             
             {error && (
-              <div className="mt-2 text-sm text-red-400 flex items-start">
-                <AlertTriangle className="h-4 w-4 mr-1 mt-0.5 flex-shrink-0" />
-                <span>{error}</span>
+              <div className="text-sm text-red-400 flex items-start">
+                <AlertTriangle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+                <span className="italic">{error}</span>
               </div>
             )}
           </div>
@@ -697,12 +692,12 @@ function TransferContent() {
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <input
                 type="text"
-                className="flex-1 p-2 bg-[#252525] text-stone-500 rounded text-sm"
+                className="flex-1 p-2 bg-border text-muted-foreground rounded text-sm"
                 value={transferLink}
                 readOnly
               />
               <Button
-                className="mont font-bold hover:bg-orange-500 whitespace-nowrap text-white w-full sm:w-auto flex items-center gap-2"
+                className="font-bold hover:bg-primary/80 whitespace-nowrap text-white w-full sm:w-auto flex items-center gap-2"
                 onClick={() => copyToClipboard(transferLink)}
               >
                 {copyText === "Copied!" ? <CheckCircle size={16} /> : <Copy size={16} />}
@@ -719,13 +714,13 @@ function TransferContent() {
               />
             </div>
             <div className="text-center">
-              <span className="mont text-sm font-bold text-orange-400">Share via</span>
-              <div className="flex flex-row items-center justify-center gap-5 text-gray-400 mt-2">
+              <span className="text-sm font-bold text-primary">Share via</span>
+              <div className="flex flex-row items-center justify-center gap-5 text-muted-foreground mt-2">
                 <a
                   href={`https://twitter.com/intent/tweet?text=Transfer%20files%20effortlessly%20with%20Celeris%20at%20${transferLink}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-orange-400"
+                  className="hover:text-primary"
                 >
                   <BsTwitterX size={20} />
                 </a>
@@ -733,7 +728,7 @@ function TransferContent() {
                   href={`https://www.facebook.com/sharer/sharer.php?u=${transferLink}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-orange-400"
+                  className="hover:text-primary"
                 >
                   <Facebook />
                 </a>
@@ -741,15 +736,15 @@ function TransferContent() {
                   href={`https://wa.me/?text=Transfer%20files%20effortlessly%20with%20Celeris%20at%20${transferLink}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-orange-400"
+                  className="hover:text-primary"
                 >
                   <FaWhatsapp size={25} />
                 </a>
               </div>
             </div>
 
-            <div className="border-t border-stone-700 pt-3 flex flex-col gap-2">
-              <label htmlFor="emailInput" className="mont text-stone-400 text-sm">
+            <div className="border-t border-border pt-3 flex flex-col gap-2">
+              <label htmlFor="emailInput" className="text-foreground text-sm">
                 Send link via email:
               </label>
               <div className="flex flex-col sm:flex-row gap-2">
@@ -757,12 +752,12 @@ function TransferContent() {
                   id="emailInput"
                   type="email"
                   placeholder="Recipient email"
-                  className="mont text-sm flex-1 p-2 rounded bg-[#252525] text-stone-300"
+                  className="text-sm flex-1 p-2 rounded bg-border text-muted-foreground"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
                 <Button
-                  className="mont font-bold hover:bg-orange-500 whitespace-nowrap text-white w-full sm:w-auto"
+                  className="font-bold hover:bg-primary/80 whitespace-nowrap text-white w-full sm:w-auto"
                   onClick={sendEmail}
                 >
                   Send Email
@@ -771,9 +766,9 @@ function TransferContent() {
             </div>
             
             {/* Button to manually start transfer */}
-            <div className="border-t border-stone-700 pt-3 mt-2">
+            <div className="border-t border-border pt-3 mt-2">
               <Button
-                className="mont font-bold bg-orange-500 hover:bg-orange-600 w-full py-6 text-white"
+                className="font-bold bg-primary hover:bg-primary/80 w-full py-6 text-white"
                 onClick={sendAllFiles}
                 disabled={
                   uiState !== ConnectionUIState.CONNECTED && 
@@ -811,7 +806,7 @@ export default function Transfer() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white">Loading...</div>
+        <div className="text-foreground">Loading...</div>
       </div>
     }>
       <TransferContent />

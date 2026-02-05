@@ -44,3 +44,4 @@ signaling-server/ecosystem.config.js.example
 signaling-server/DEPLOYMENT.md
 /signaling-server/node_modules
 signaling-server/DEPLOYMENT-APP-PLATFORM.md
+celeris/package-lock.json
