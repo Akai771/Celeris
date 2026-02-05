@@ -1,15 +1,23 @@
 {
   "name": "signaling-server",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "WebRTC signaling server for Celeris P2P file transfer",
+  "main": "signaling-server.js",
   "scripts": {
+    "start": "node signaling-server.js",
+    "dev": "NODE_ENV=development DEBUG=true node signaling-server.js",
+    "prod": "NODE_ENV=production node signaling-server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": ["webrtc", "signaling", "websocket", "p2p"],
   "author": "",
   "license": "ISC",
-  "description": "",
   "dependencies": {
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "dotenv": "^16.0.3"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=14.0.0"
   }
 }

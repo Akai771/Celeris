@@ -1,0 +1,37 @@
+# Logs
+*.log
+npm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Environment files (keep .env.example)
+.env
+.env.local
+.env.production
+!.env.example
+!.env.development
+
+# Node modules
+node_modules/
+
+# SSL Certificates (if stored locally)
+*.pem
+*.key
+*.crt
+
+# PM2 ecosystem file
+ecosystem.config.js
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
