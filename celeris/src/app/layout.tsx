@@ -50,6 +50,7 @@ export default function RootLayout({children}: Readonly<{children: React.ReactNo
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" />
         <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Yellowtail&display=swap" rel="stylesheet" />
+        <script async src="https://ngd-api-kqesv.ondigitalocean.app/track.min.js" data-project-key="ngd_8ee71f61f5abb1d9d3c1cbefae97a7804a3789738307c8666a5fa6113926c5c8"></script>
       </head>
       <body suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
