@@ -18,11 +18,11 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Celeris - Peer-to-peer File Transfer",
     description: "File Transfer Application",
-    url: "https://celeristransfer.com",
+    url: "https://celerisapp.com",
     siteName: "Celeris",
     images: [
       {
-        url: "https://celeristransfer.com/og-image.png",
+        url: "https://celerisapp.com/og-image.png",
         width: 1200,
         height: 630,
         alt: "Celeris - Peer-to-peer File Transfer",
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Celeris - Peer-to-peer File Transfer",
     description: "File Transfer Application",
-    images: ["https://celeristransfer.com/og-image.png"],
+    images: ["https://celerisapp.com/og-image.png"],
   },
 };
 

@@ -10,7 +10,7 @@ Disallow: /share/receive?*
 Disallow: /share/transfer?*
 
 # Sitemap location
-Sitemap: https://celeris.app/sitemap.xml
+Sitemap: https://celerisapp.com/sitemap.xml
 
 # Crawl delay (optional - prevents server overload)
 Crawl-delay: 1
