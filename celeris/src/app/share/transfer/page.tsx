@@ -449,7 +449,7 @@ function TransferContent() {
     const newConnectionId = generateConnectionId();
     setConnectionId(newConnectionId);
     setWebRTCConnectionId(newConnectionId);
-    setTransferLink(`http://localhost:3000/share/receive?id=${newConnectionId}`);
+    setTransferLink(`${process.env.NEXT_PUBLIC_BASE_URL}/share/receive?id=${newConnectionId}`);
     
     // Close the modal
     setModalOpen(false);
