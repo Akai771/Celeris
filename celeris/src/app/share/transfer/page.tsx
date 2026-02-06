@@ -461,7 +461,7 @@ function TransferContent() {
   const renderConnectionStatus = () => {
     switch (uiState) {
       case ConnectionUIState.IDLE:
-        return <span className="text-muted-foreground">Not connected</span>;
+        return <span className="text-red-500">Not connected</span>;
       case ConnectionUIState.CREATING:
       case ConnectionUIState.CONNECTING:
         return (
@@ -523,8 +523,8 @@ function TransferContent() {
           <div className="w-full max-w-[102dvh] flex flex-col items-center justify-center">
             {/* Connection status indicator */}
             <div className="flex w-full items-center justify-end gap-2 my-2">
-              <Badge className={`bg-transparent ${uiState === ConnectionUIState.CONNECTED ? "bg-green-500/10" : "bg-red-500/10"} ${uiState === ConnectionUIState.CONNECTED ? "border-green-600" : "border-red-600"}`}>
-                <div className={`w-2 h-2 rounded-xl ${uiState === ConnectionUIState.CONNECTED ? "bg-green-500" : "bg-red-500"} animate-pulse`}/>
+              <Badge className={`bg-transparent ${uiState === ConnectionUIState.ERROR || uiState === ConnectionUIState.IDLE ? "bg-red-500/10" : "bg-green-500/10"} ${uiState === ConnectionUIState.ERROR || uiState === ConnectionUIState.IDLE ? "border-red-600" : "border-green-600"}`}>
+                <div className={`w-2 h-2 rounded-xl ${uiState === ConnectionUIState.ERROR || uiState === ConnectionUIState.IDLE ? "bg-red-500" : "bg-green-500"} animate-pulse`}/>
                 {renderConnectionStatus()}
               </Badge>
             </div>

@@ -40,8 +40,8 @@ export default function AnimatedBeam_Test({
 
 
   return (
-    <div className={cn("relative flex h-[400px] sm:h-[450px] md:h-[500px] w-full items-center justify-center overflow-hidden rounded-lg bg-transparent p-4 sm:p-6 md:p-10",className,)} ref={containerRef}>
-      <div className="flex size-full flex-row items-stretch justify-between gap-8 sm:gap-16 md:gap-[20dvh] lg:gap-[30dvh] w-4xl">
+    <div className={cn("relative flex h-[300px] sm:h-[450px] md:h-[500px] w-full items-center justify-center overflow-hidden rounded-lg bg-transparent p-4 sm:p-6 md:p-10",className,)} ref={containerRef}>
+      <div className="flex size-full flex-row items-stretch justify-between gap-20 md:gap-[30dvh] w-4xl">
         <div className="flex flex-col justify-center">
           <Circle ref={div1Ref} className="size-12 sm:size-14 md:size-16">
             <Icons.user />

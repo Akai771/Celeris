@@ -1,0 +1,36 @@
+# Celeris - P2P File Transfer
+# https://www.robotstxt.org/robotstxt.html
+
+# Allow all crawlers
+User-agent: *
+Allow: /
+
+# Disallow dynamic transfer/receive pages (they contain session-specific IDs)
+Disallow: /share/receive?*
+Disallow: /share/transfer?*
+
+# Sitemap location
+Sitemap: https://celeris.app/sitemap.xml
+
+# Crawl delay (optional - prevents server overload)
+Crawl-delay: 1
+
+# Specific bot rules
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+# Block bad bots (optional)
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /

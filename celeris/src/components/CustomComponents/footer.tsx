@@ -15,6 +15,10 @@ export default function Footer() {
       { name: "GitHub Repository", href: "https://github.com/akai771/celeris" },
       { name: "Report Issue", href: "https://github.com/akai771/celeris/issues" },
     ],
+    legal: [
+      { name: "Privacy Policy", path: "/legal/privacy" },
+      { name: "Terms & Conditions", path: "/legal/terms" },
+    ],
   };
 
   const { isDark } = useThemeToggle({
@@ -25,7 +29,7 @@ export default function Footer() {
   return (
     <footer className="bg-background">
       <div className="container bg-muted-foreground/10 md:rounded-xl md:mb-12 mx-auto px-8 py-10">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           {/* Brand Section */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
@@ -74,6 +78,23 @@ export default function Footer() {
                   >
                     {link.name}
                   </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Legal Links */}
+          <div>
+            <h3 className="font-semibold mb-3 text-foreground">Legal</h3>
+            <ul className="space-y-2">
+              {footerLinks.legal.map((link) => (
+                <li key={link.name}>
+                  <Link
+                    href={link.path}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {link.name}
+                  </Link>
                 </li>
               ))}
             </ul>

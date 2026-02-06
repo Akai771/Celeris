@@ -139,7 +139,14 @@ export function useWebRTC(signalingUrl: string) {
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
           { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' }
+          { urls: 'stun:stun4.l.google.com:19302' },
+          ...(process.env.NEXT_PUBLIC_TURN_URL && 
+              process.env.NEXT_PUBLIC_TURN_USERNAME && 
+              process.env.NEXT_PUBLIC_TURN_CREDENTIAL ? [{
+            urls: process.env.NEXT_PUBLIC_TURN_URL,
+            username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+            credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL
+          }] : [])
         ],
         // These options help improve connection robustness
         iceCandidatePoolSize: 10,
@@ -150,6 +157,14 @@ export function useWebRTC(signalingUrl: string) {
       const pc = new RTCPeerConnection(configuration);
       peerConnection.current = pc;
       
+      // Log the ICE servers being used (without credentials for security)
+      console.log('ICE servers configured:', configuration.iceServers?.map(server => {
+        if (typeof server.urls === 'string') {
+          return server.urls.includes('turn:') ? 'TURN server (relay)' : server.urls;
+        }
+        return server.urls;
+      }) || []);
+      
       // Log negotiation needed events
       pc.onnegotiationneeded = () => {
         console.log("Negotiation needed event fired");
@@ -158,7 +173,14 @@ export function useWebRTC(signalingUrl: string) {
       // Handle ICE candidate events
       pc.onicecandidate = (event) => {
         if (event.candidate) {
-          console.log("ICE candidate generated:", event.candidate.candidate ? event.candidate.candidate.substr(0, 50) + '...' : 'empty');
+          // Log candidate type to see if TURN is being used
+          const candidateStr = event.candidate.candidate || '';
+          const candidateType = candidateStr.includes('typ relay') ? 'TURN (relay)' : 
+                               candidateStr.includes('typ srflx') ? 'STUN (server-reflexive)' :
+                               candidateStr.includes('typ host') ? 'Host (local)' : 'Unknown';
+          
+          console.log(`ICE candidate generated [${candidateType}]:`, 
+                     candidateStr ? candidateStr.substr(0, 50) + '...' : 'empty');
           
           const candidateMessage = {
             type: 'candidate',

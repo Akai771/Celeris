@@ -2,9 +2,7 @@
 
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { 
-  ChevronLeft, 
   Download, 
   RefreshCw, 
   CheckCircle, 
@@ -14,7 +12,6 @@ import {
   FileIcon,
   LinkIcon,
   Copy,
-  Save
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import BlurFade from "@/components/ui/blur-fade";
@@ -398,7 +395,7 @@ function ReceiveContent() {
   const renderConnectionStatus = () => {
     switch (uiState) {
       case ConnectionUIState.IDLE:
-        return <span className="text-foreground">Not connected</span>;
+        return <span className="text-red-500">Not connected</span>;
       case ConnectionUIState.JOINING:
       case ConnectionUIState.WAITING:
         return (
@@ -441,7 +438,7 @@ function ReceiveContent() {
   return (
     <>
       <div className="pt-20 px-4 md:px-0">
-        <div className="min-h-[10dvh] flex flex-col items-start sm:items-center justify-start sm:justify-center">
+        <div className="min-h-[10dvh] flex flex-col items-center sm:items-center justify-start sm:justify-center">
           <BlurFade delay={0} className="items-center flex flex-col">
             <h1 className="text-3xl sm:text-4xl font-bold text-center">
               Receive Files with <span className="text-primary">Ease</span>
@@ -456,8 +453,8 @@ function ReceiveContent() {
           <div className="w-full max-w-[102dvh] flex flex-col items-center justify-center">
             {/* Connection status indicator */}
             <div className="flex w-full items-center justify-end gap-2 my-2">
-              <Badge className={`bg-transparent ${uiState === ConnectionUIState.ERROR ? "bg-red-500/10" : "bg-green-500/10"} ${uiState === ConnectionUIState.ERROR ? "border-red-600" : "border-green-600"}`}>
-                <div className={`w-2 h-2 rounded-xl ${uiState === ConnectionUIState.ERROR ? "bg-red-500" : "bg-green-500"} animate-pulse`}/>
+              <Badge className={`bg-transparent ${uiState === ConnectionUIState.ERROR || uiState === ConnectionUIState.IDLE ? "bg-red-500/10" : "bg-green-500/10"} ${uiState === ConnectionUIState.ERROR || uiState === ConnectionUIState.IDLE ? "border-red-600" : "border-green-600"}`}>
+                <div className={`w-2 h-2 rounded-xl ${uiState === ConnectionUIState.ERROR || uiState === ConnectionUIState.IDLE ? "bg-red-500" : "bg-green-500"} animate-pulse`}/>
                 {renderConnectionStatus()}
               </Badge>
             </div>
