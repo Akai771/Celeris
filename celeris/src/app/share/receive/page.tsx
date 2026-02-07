@@ -38,6 +38,7 @@ import { Input } from "@/components/ui/input";
 import { FileReceiver } from "@/lib/transferFile";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Define connection states for UI feedback
 enum ConnectionUIState {
