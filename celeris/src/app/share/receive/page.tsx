@@ -451,14 +451,14 @@ function ReceiveContent() {
 				<div className="flex-1 flex flex-col items-center justify-center max-w-4xl mx-auto w-full">
 					<BlurFade
 						delay={0}
-						className="items-center flex flex-col mb-4 sm:mb-5 lg:mb-6">
+						className="items-center flex flex-col mb-4">
 						<h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-4xl xl:text-5xl font-bold text-center tracking-tighter leading-tight">
 							Receive Files with <span className="text-primary">Ease</span>
 						</h1>
 					</BlurFade>
 					<BlurFade
 						delay={0.5}
-						className="items-center flex flex-col mb-5 sm:mb-6 lg:mb-8">
+						className="items-center flex flex-col">
 						<span className="text-xs sm:text-sm lg:text-sm text-muted-foreground text-center px-2 leading-relaxed">
 							Enter a connection ID or paste a link to start receiving files.
 						</span>
@@ -595,7 +595,7 @@ function ReceiveContent() {
 				</div>
 
 				{/* Footer - Sticky to bottom */}
-				<div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 mt-4 sm:mt-5 lg:mt-6 w-full max-w-4xl mx-auto">
+				<div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 mt-4 w-full max-w-4xl mx-auto">
 					{receivedFiles.length > 0 && (
 						<Button
 							className="font-bold bg-primary hover:bg-primary/80 transition-all ease-in-out duration-300 hover:scale-[1.02] w-full sm:w-auto flex items-center justify-center h-11 sm:h-12 lg:h-14 px-6 sm:px-8 text-sm sm:text-base"

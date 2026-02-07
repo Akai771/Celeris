@@ -526,13 +526,13 @@ function TransferContent() {
     <>
       <div className="min-h-screen lg:h-screen flex flex-col pt-20 pb-4 sm:pt-24 sm:pb-6 lg:pt-32 lg:pb-8 px-4 sm:px-6 lg:px-8">
         <div className="flex-1 flex flex-col items-center justify-center max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto w-full">
-          <BlurFade delay={0} className="items-center flex flex-col mb-4 sm:mb-6 lg:mb-8">
+          <BlurFade delay={0} className="items-center flex flex-col mb-4">
             <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-4xl xl:text-5xl font-bold text-center tracking-tighter leading-tight">
               Transfer Files <span className="text-primary">Effortlessly</span>
             </h1>
           </BlurFade>
 
-          <BlurFade delay={0.5} className="items-center flex flex-col mb-6">
+          <BlurFade delay={0.5} className="items-center flex flex-col">
             <span className="text-xs sm:text-sm lg:text-sm text-muted-foreground text-center px-4 font-light tracking-wide">
               Upload files to generate a secure link for direct sharing.
             </span>
@@ -633,7 +633,7 @@ function TransferContent() {
         </div>
 
         {/* Footer - Sticky to bottom */}
-        <div className="flex flex-col items-center gap-3 sm:gap-4 mt-4 sm:mt-6 lg:mt-8 w-full max-w-5xl mx-auto">
+        <div className="flex flex-col items-center gap-3 sm:gap-4 mt-4 sm:mt-6 lg:mt-2 w-full max-w-5xl mx-auto">
           {!!files.length && (
             <div className="flex items-center gap-2 sm:gap-3 rounded-xl bg-secondary/30 border border-border px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm w-full sm:w-auto justify-center backdrop-blur-sm">
               <div className="text-muted-foreground">
