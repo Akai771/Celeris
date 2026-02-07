@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, Suspense } from "react";
+import React, { useState, useEffect, useRef, Suspense, ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
 	Download,
@@ -109,16 +109,13 @@ function ReceiveContent() {
 	useEffect(() => {
 		// Prevent multiple initializations
 		if (hasInitialized.current) {
-			console.log("Already initialized, skipping");
 			return;
 		}
 
 		const id = searchParams.get("id");
-		console.log("URL connection ID:", id);
 
 		if (id && id.trim() !== "") {
 			hasInitialized.current = true;
-			console.log("Setting connection ID from URL:", id);
 			setConnectionId(id);
 			setConnectionIdInput(id);
 			setWebRTCConnectionId(id);
@@ -126,14 +123,11 @@ function ReceiveContent() {
 
 			// Use a longer delay to ensure everything is set up
 			setTimeout(async () => {
-				console.log("Connecting with ID from URL:", id);
 				try {
 					const success = await joinConnection();
 					if (success) {
-						console.log("Join connection succeeded");
 						setUIState(ConnectionUIState.WAITING);
 					} else {
-						console.log("Join connection returned false");
 						setError("Failed to join connection");
 						setUIState(ConnectionUIState.ERROR);
 					}
@@ -149,12 +143,6 @@ function ReceiveContent() {
 	// Watch for WebRTC errors - but only show error if it's a real problem
 	useEffect(() => {
 		if (webRTCError) {
-			console.log(
-				"WebRTC error received:",
-				webRTCError,
-				"Current UI state:",
-				uiState,
-			);
 
 			// Only show error if we're not in the middle of connecting or already connected
 			// Some "errors" during connection establishment are transient
@@ -180,7 +168,6 @@ function ReceiveContent() {
 	// Initialize the file receiver when data channel is ready
 	useEffect(() => {
 		if (dataChannel) {
-			console.log("Data channel available, setting up file receiver");
 
 			// Always create a fresh file receiver when data channel changes
 			fileReceiverRef.current = new FileReceiver(
@@ -196,7 +183,6 @@ function ReceiveContent() {
 				},
 				// File complete callback
 				(file: File) => {
-					console.log("File complete callback triggered:", file.name);
 					// Add to received files
 					setReceivedFiles((prev: File[]) => [...prev, file]);
 
@@ -209,7 +195,6 @@ function ReceiveContent() {
 
 			// Set up data channel message handler
 			dataChannel.onmessage = (event: MessageEvent) => {
-				console.log("Data channel message received, type:", typeof event.data);
 				// Set UI state to receiving when data starts coming in
 				setUIState(ConnectionUIState.RECEIVING);
 
@@ -221,12 +206,10 @@ function ReceiveContent() {
 
 			// Also handle data channel state changes
 			dataChannel.onopen = () => {
-				console.log("Data channel opened on receive page");
 				setUIState(ConnectionUIState.CONNECTED);
 			};
 
 			dataChannel.onclose = () => {
-				console.log("Data channel closed on receive page");
 				if (receivedFiles.length > 0) {
 					setUIState(ConnectionUIState.COMPLETE);
 				}
@@ -243,7 +226,6 @@ function ReceiveContent() {
 
 	// Update UI based on connection state changes
 	useEffect(() => {
-		console.log("Connection state changed to:", connectionState);
 
 		switch (connectionState) {
 			case "new":
@@ -275,14 +257,12 @@ function ReceiveContent() {
 						setUIState(ConnectionUIState.COMPLETE);
 					} else {
 						// Peer disconnected before sending files
-						console.log("Disconnected, but no files received yet");
 					}
 				}
 				break;
 			case "failed":
 				// Only show error if we were actively connected or had gone past initial joining
 				// During initial connection, 'failed' might be temporary
-				console.log("Connection state failed, current UI state:", uiState);
 				if (
 					uiState === ConnectionUIState.CONNECTED ||
 					uiState === ConnectionUIState.RECEIVING
@@ -317,7 +297,6 @@ function ReceiveContent() {
 			uiState !== ConnectionUIState.ERROR &&
 			uiState !== ConnectionUIState.IDLE
 		) {
-			console.log("Connection already in progress, skipping");
 			return;
 		}
 
@@ -667,7 +646,7 @@ function ReceiveContent() {
 							placeholder="Connection ID or full link"
 							className="bg-muted/20 border-muted text-foreground focus-visible:ring-primary"
 							value={connectionIdInput}
-							onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+							onChange={(e: ChangeEvent<HTMLInputElement>) => {
 								const value = e.target.value;
 								// Extract ID if it's a URL
 								if (value.includes("?id=")) {

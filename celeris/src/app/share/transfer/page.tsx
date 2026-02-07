@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import React, { memo, useMemo, useEffect, useState, Suspense } from "react";
 import { useDropzone } from "react-dropzone";
 import { 
   Trash2, 
@@ -109,31 +109,49 @@ function getFileTypeIcon(file: File) {
   }
 }
 
-function FilePreview({ file }: { file: File }) {
-  if (file.type.startsWith("image/")) {
+const FilePreview = memo(({ file }: { file: File }) => {
+  const previewUrl = useMemo(() => {
+    if (file.type.startsWith("image/") || 
+        file.type.startsWith("video/") || 
+        file.type === "application/pdf") {
+      return URL.createObjectURL(file);
+    }
+    return null;
+  }, [file]);
+
+  // Cleanup blob URL when component unmounts or file changes
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  if (file.type.startsWith("image/") && previewUrl) {
     return (
       <img
-        src={URL.createObjectURL(file)}
+        src={previewUrl}
         alt={file.name}
         className="w-full h-full object-cover rounded"
       />
     );
   }
 
-  if (file.type.startsWith("video/")) {
+  if (file.type.startsWith("video/") && previewUrl) {
     return (
       <video
-        src={URL.createObjectURL(file)}
+        src={previewUrl}
         className="w-full h-full object-cover rounded"
         muted
       />
     );
   }
 
-  if (file.type === "application/pdf") {
+  if (file.type === "application/pdf" && previewUrl) {
     return (
       <embed
-        src={URL.createObjectURL(file)}
+        src={previewUrl}
         type="application/pdf"
         className="w-full h-full rounded"
       />
@@ -141,7 +159,9 @@ function FilePreview({ file }: { file: File }) {
   }
 
   return <div className="mt-2">{getFileTypeIcon(file)}</div>;
-}
+});
+
+FilePreview.displayName = 'FilePreview';
 
 // Generate a random connection ID
 function generateConnectionId(length = 10) {
@@ -198,7 +218,6 @@ function TransferContent() {
   useEffect(() => {
     // Generate a stable connection ID that won't change with rerenders
     const newConnectionId = generateConnectionId();
-    console.log("Generated connection ID:", newConnectionId);
     
     setConnectionId(newConnectionId);
     setWebRTCConnectionId(newConnectionId);
@@ -207,11 +226,9 @@ function TransferContent() {
     const baseUrl = window.location.origin;
     setTransferLink(`${baseUrl}/share/receive?id=${newConnectionId}`);
     
-    console.log("Transfer link:", `${baseUrl}/share/receive?id=${newConnectionId}`);
     
     // Cleanup on unmount
     return () => {
-      console.log("Transfer component unmounting, closing connection");
       closeConnection();
     };
   }, []);
@@ -219,7 +236,6 @@ function TransferContent() {
   // Update UI state based on connection state
   useEffect(() => {
     if (webRTCError) {
-      console.log("WebRTC error received:", webRTCError, "Current UI state:", uiState);
       
       // Only show error if we're in a connected/transferring state
       // During connection establishment, some errors are transient
@@ -240,7 +256,6 @@ function TransferContent() {
   
   // Update UI based on connection state changes
   useEffect(() => {
-    console.log("Connection state changed to:", connectionState, "UI state:", uiState);
     
     switch (connectionState) {
       case "new":
@@ -269,7 +284,6 @@ function TransferContent() {
         // Only show error if we were actively connected or transferring
         if (uiState === ConnectionUIState.CONNECTED || 
             uiState === ConnectionUIState.TRANSFERRING) {
-          console.log("Disconnected while connected/transferring");
           // Don't immediately mark as error - peer might just have received all files
         }
         break;
@@ -388,7 +402,12 @@ function TransferContent() {
       setUIState(ConnectionUIState.TRANSFERRING);
       
       // Transfer the file with progress updates
-      await sendFile(file);
+      await sendFile(file, (progress) => {
+        setTransferProgress(prev => ({
+          ...prev,
+          [file.name]: progress
+        }));
+      });
       
       // Mark as complete
       setTransferComplete(prev => [...prev, file.name]);
@@ -513,7 +532,7 @@ function TransferContent() {
             </h1>
           </BlurFade>
 
-          <BlurFade delay={0.5} className="items-center flex flex-col mb-6 sm:mb-8 lg:mb-10">
+          <BlurFade delay={0.5} className="items-center flex flex-col mb-6">
             <span className="text-xs sm:text-sm lg:text-sm text-muted-foreground text-center px-4 font-light tracking-wide">
               Upload files to generate a secure link for direct sharing.
             </span>
@@ -546,9 +565,9 @@ function TransferContent() {
               ) : (
                 <ScrollArea className="h-[40dvh] sm:h-[45dvh] lg:h-full lg:max-h-[calc(100vh-30rem)] w-full rounded-md">
                   <div className="flex flex-wrap gap-4 justify-start mt-5 px-2">
-                    {files.map((file, i) => (
+                    {files.map((file) => (
                       <div
-                        key={i}
+                        key={`${file.name}-${file.size}-${file.lastModified}`}
                         className="relative flex flex-col items-center justify-center w-36 sm:w-40 h-36 sm:h-40 bg-border rounded-md p-2 hover:bg-[#3a3a3a] transition duration-200 group"
                       >
                         <div className="w-24 sm:w-28 h-24 sm:h-28 flex items-center justify-center mt-1 rounded overflow-hidden">

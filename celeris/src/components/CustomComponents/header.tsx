@@ -40,13 +40,11 @@ export default function Header() {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center space-x-2 cursor-pointer">
             <img 
-              src="/logo.png" 
-              alt="GitIntro Logo" 
-              className="w-8 h-8 rounded-lg"
+              src={isDark ? "/logo_Dark.svg" : "/logo_Light.svg"}
+              alt="Celeris Logo" 
+              className="w-8 h-8 object-contain"
             />
-            <span className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">
-              GitIntro
-            </span>
+            <span className="text-xl font-bold">Celeris</span>
           </Link>
           <CustomToggle />
         </div>
@@ -60,9 +58,12 @@ export default function Header() {
         {/* Logo */}
         <Link href="/" className="flex items-center cursor-pointer">
           <div className="flex items-center gap-3">
-          <div className="w-2.5 h-2.5 bg-primary rounded-full animate-pulse" />
-          <h1 className="text-xl font-bold tracking-tight text-foreground">Celeris</h1>
-        </div>
+            <img 
+              src={isDark ? "/logo_Dark.svg" : "/logo_Light.svg"}
+              alt="Celeris Logo" 
+              className="w-8 h-8 object-contain"
+            />
+          </div>
         </Link>
         <div className="flex flex-row">
           <CustomToggle />

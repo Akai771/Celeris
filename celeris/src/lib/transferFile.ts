@@ -35,7 +35,7 @@ interface FileMetadata {
   
       try {
         // Define chunk size based on file size (larger chunks for bigger files)
-        const chunkSize = file.size < 1000000 ? 16 * 1024 : 64 * 1024; // 16KB or 64KB
+        const chunkSize = 256 * 1024; // 256 KB chunks
         let offset = 0;
         let lastProgressReport = 0;
         
@@ -48,7 +48,6 @@ interface FileMetadata {
         };
         
         channel.send(JSON.stringify(fileInfo));
-        console.log(`Starting transfer of ${file.name} (${file.size} bytes)`);
         
         // Set up the file reader
         const reader = new FileReader();
@@ -91,7 +90,6 @@ interface FileMetadata {
           } else {
             // All done, send completion message
             channel.send(JSON.stringify({ type: 'file-complete' }));
-            console.log(`File transfer complete: ${file.name}`);
             resolve();
           }
         };
@@ -133,16 +131,9 @@ interface FileMetadata {
      * Process an incoming message from the data channel
      */
     processMessage(data: string | ArrayBuffer | Blob): void {
-      // Log message type for debugging
-      console.log("FileReceiver: Received message type:", 
-                  typeof data === 'string' ? 'string' : 
-                  data instanceof ArrayBuffer ? 'ArrayBuffer' : 
-                  data instanceof Blob ? 'Blob' : 'unknown');
-      
       // Handle string messages (metadata)
       if (typeof data === 'string') {
         try {
-          console.log("FileReceiver: Processing string message:", data.substring(0, 100));
           const parsed = JSON.parse(data);
           
           if (parsed.type === 'file-info') {
@@ -150,11 +141,9 @@ interface FileMetadata {
             this.fileInfo = parsed;
             this.chunks = [];
             this.bytesReceived = 0;
-            console.log(`FileReceiver: Receiving file: ${parsed.name} (${parsed.size} bytes)`);
           } 
           else if (parsed.type === 'file-complete') {
             // File transfer complete, assemble file
-            console.log(`FileReceiver: File transfer complete, finalizing`);
             this.finalizeFile();
           }
         } catch (e) {
@@ -167,7 +156,6 @@ interface FileMetadata {
         
         // Convert Blob to ArrayBuffer if needed
         if (data instanceof Blob) {
-          console.log("FileReceiver: Converting Blob to ArrayBuffer");
           // Create a Promise to read the blob as ArrayBuffer
           const reader = new FileReader();
           reader.onload = (e) => {
@@ -190,7 +178,6 @@ interface FileMetadata {
      * Process an ArrayBuffer chunk
      */
     private processArrayBuffer(buffer: ArrayBuffer): void {
-      console.log(`FileReceiver: Processing chunk of size ${buffer.byteLength} bytes`);
       const chunk = new Uint8Array(buffer);
       this.chunks.push(chunk);
       this.bytesReceived += chunk.length;
@@ -199,11 +186,6 @@ interface FileMetadata {
       if (this.onProgressCallback && this.fileInfo) {
         const progress = Math.min(100, Math.round((this.bytesReceived / this.fileInfo.size) * 100));
         this.onProgressCallback(progress);
-        
-        // Log every 10% progress
-        if (progress % 10 === 0) {
-          console.log(`FileReceiver: Transfer progress: ${progress}%`);
-        }
       }
     }
     
@@ -234,9 +216,7 @@ interface FileMetadata {
           this.fileInfo.name, 
           { type: this.fileInfo.mimeType }
         );
-        
-        console.log(`File received: ${file.name} (${file.size} bytes)`);
-        
+                
         // Invoke the callback with the assembled file
         if (this.onCompleteCallback) {
           this.onCompleteCallback(file);

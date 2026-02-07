@@ -375,7 +375,7 @@ export default function HomePage() {
         <footer ref={footerRef} className="relative z-10 w-full py-4 sm:py-6 lg:py-8 border-t border-border flex justify-center gap-6 sm:gap-12 md:gap-24 lg:gap-32 mt-6 sm:mt-8 lg:mt-12">
           <div className="text-center">
             <div className="text-xs text-muted-foreground uppercase tracking-widest mb-1 text-[10px] sm:text-xs lg:text-sm">Encryption</div>
-            <div className="font-mono text-foreground text-xs sm:text-sm lg:text-base">AES-256</div>
+            <div className="font-mono text-foreground text-xs sm:text-sm lg:text-base">DTLS</div>
           </div>
           <div className="text-center">
             <div className="text-xs text-muted-foreground uppercase tracking-widest mb-1 text-[10px] sm:text-xs lg:text-sm">Mode</div>
