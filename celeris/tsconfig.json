@@ -33,9 +33,6 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    "src/lib/utils.js",
-    "src/app/page.tsx",
-    "src/hooks/useWebRTC.ts",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [

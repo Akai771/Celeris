@@ -505,41 +505,46 @@ function TransferContent() {
 
   return (
     <>
-      <div className="pt-20 px-4 md:px-0">
-        <div className="min-h-[10dvh] flex flex-col items-start sm:items-center justify-start sm:justify-center">
-          <BlurFade delay={0} className="items-center flex flex-col">
-            <h1 className="text-3xl sm:text-4xl font-bold text-center">
+      <div className="min-h-screen lg:h-screen flex flex-col pt-20 pb-4 sm:pt-24 sm:pb-6 lg:pt-32 lg:pb-8 px-4 sm:px-6 lg:px-8">
+        <div className="flex-1 flex flex-col items-center justify-center max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto w-full">
+          <BlurFade delay={0} className="items-center flex flex-col mb-4 sm:mb-6 lg:mb-8">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-4xl xl:text-5xl font-bold text-center tracking-tighter leading-tight">
               Transfer Files <span className="text-primary">Effortlessly</span>
             </h1>
           </BlurFade>
 
-          <BlurFade delay={0.5} className="items-center flex flex-col">
-            <span className="text-md sm:text-sm text-muted-foreground mt-2 sm:mt-1 text-center">
+          <BlurFade delay={0.5} className="items-center flex flex-col mb-6 sm:mb-8 lg:mb-10">
+            <span className="text-xs sm:text-sm lg:text-sm text-muted-foreground text-center px-4 font-light tracking-wide">
               Upload files to generate a secure link for direct sharing.
             </span>
           </BlurFade>
-          
 
-          <div className="w-full max-w-[102dvh] flex flex-col items-center justify-center">
+
+          <div className="w-full flex flex-col items-center justify-center flex-1 max-w-5xl">
             {/* Connection status indicator */}
-            <div className="flex w-full items-center justify-end gap-2 my-2">
-              <Badge className={`bg-transparent ${uiState === ConnectionUIState.ERROR || uiState === ConnectionUIState.IDLE ? "bg-red-500/10" : "bg-green-500/10"} ${uiState === ConnectionUIState.ERROR || uiState === ConnectionUIState.IDLE ? "border-red-600" : "border-green-600"}`}>
-                <div className={`w-2 h-2 rounded-xl ${uiState === ConnectionUIState.ERROR || uiState === ConnectionUIState.IDLE ? "bg-red-500" : "bg-green-500"} animate-pulse`}/>
+            <div className="flex w-full items-center justify-end gap-2 mb-3 sm:mb-4">
+              <Badge className={`text-xs sm:text-sm font-medium ${uiState === ConnectionUIState.ERROR || uiState === ConnectionUIState.IDLE ? "bg-red-500/10 border-red-600" : "bg-green-500/10 border-green-600"}`}>
+                <div className={`w-2 h-2 rounded-full mr-2 ${uiState === ConnectionUIState.ERROR || uiState === ConnectionUIState.IDLE ? "bg-red-500" : "bg-green-500"} animate-pulse`}/>
                 {renderConnectionStatus()}
               </Badge>
             </div>
-            
+
             <div
               {...getRootProps()}
-              className="relative px-4 rounded-md w-full h-[60dvh] bg-border flex items-center justify-center cursor-pointer overflow-hidden"
+              className="relative px-4 sm:px-6 lg:px-8 rounded-xl sm:rounded-2xl w-full h-[50vh] sm:h-[55vh] lg:flex-1 lg:max-h-[calc(100vh-28rem)] bg-card border border-border hover:border-border/80 transition-all duration-500 flex items-center justify-center cursor-pointer overflow-hidden group"
             >
               <input {...getInputProps()} />
               {!files.length ? (
-                <p className="text-stone-500 text-center px-2">
-                  Drag &amp; drop files here, or click to select files
-                </p>
+                <div className="text-center px-4">
+                  <p className="text-muted-foreground text-sm sm:text-base lg:text-lg font-light mb-2">
+                    Drag &amp; drop files here
+                  </p>
+                  <p className="text-muted-foreground/60 text-xs sm:text-sm">
+                    or click to browse
+                  </p>
+                </div>
               ) : (
-                <ScrollArea className="h-[53dvh] w-[100dvh] rounded-md">
+                <ScrollArea className="h-[40dvh] sm:h-[45dvh] lg:h-full lg:max-h-[calc(100vh-30rem)] w-full rounded-md">
                   <div className="flex flex-wrap gap-4 justify-start mt-5 px-2">
                     {files.map((file, i) => (
                       <div
@@ -606,54 +611,55 @@ function TransferContent() {
               />
             </div>
           </div>
-          
-          <div className="flex flex-col items-start sm:items-center gap-3 mt-5 w-full sm:w-auto">
-            {!!files.length && (
-              <div className="flex items-center gap-2 rounded-lg bg-gray-800/50 px-3 py-2 text-sm w-full sm:w-auto">
-                <div className="text-gray-400">
-                  {files.length === 1 ? (
-                    <FileIcon className="h-4 w-4" />
-                  ) : (
-                    <Files className="h-4 w-4" />
-                  )}
-                </div>
-                <div className="text-gray-300">
-                  <span>
-                    {files.length} file{files.length !== 1 ? "s" : ""}
-                  </span>
-                  {files.length > 0 && (
-                    <>
-                      <span className="mx-2 text-gray-500">•</span>
-                      <span className="font-medium">{formatFileSize(totalSize)}</span>
-                    </>
-                  )}
-                </div>
+        </div>
+
+        {/* Footer - Sticky to bottom */}
+        <div className="flex flex-col items-center gap-3 sm:gap-4 mt-4 sm:mt-6 lg:mt-8 w-full max-w-5xl mx-auto">
+          {!!files.length && (
+            <div className="flex items-center gap-2 sm:gap-3 rounded-xl bg-secondary/30 border border-border px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm w-full sm:w-auto justify-center backdrop-blur-sm">
+              <div className="text-muted-foreground">
+                {files.length === 1 ? (
+                  <FileIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                ) : (
+                  <Files className="h-4 w-4 sm:h-5 sm:w-5" />
+                )}
               </div>
-            )}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-              <Button
-                className="font-bold hover:bg-primary/70 transition-all ease-in-out duration-200 w-full sm:w-auto flex items-center justify-center"
-                onClick={toggleModal}
-                disabled={uiState === ConnectionUIState.CREATING || uiState === ConnectionUIState.CONNECTING}
-              >
-                <Rocket className="w-5" />Transfer
-              </Button>
-              {!!files.length && (
-                <Button
-                  variant="destructive"
-                  className="font-bold transition-all ease-in-out duration-200 w-full sm:w-auto"
-                  onClick={handleRemoveAllFiles}
-                >
-                  <Trash className="w-5" />Remove All 
-                </Button>
-              )}
+              <div className="text-foreground font-medium">
+                <span>
+                  {files.length} file{files.length !== 1 ? "s" : ""}
+                </span>
+                {files.length > 0 && (
+                  <>
+                    <span className="mx-2 text-muted-foreground">•</span>
+                    <span className="text-primary">{formatFileSize(totalSize)}</span>
+                  </>
+                )}
+              </div>
             </div>
+          )}
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 w-full sm:w-auto">
+            <Button
+              className="font-bold bg-primary hover:bg-primary/80 transition-all ease-in-out duration-300 hover:scale-[1.02] w-full sm:w-auto flex items-center justify-center h-11 sm:h-12 lg:h-14 px-6 sm:px-8 text-sm sm:text-base"
+              onClick={toggleModal}
+              disabled={uiState === ConnectionUIState.CREATING || uiState === ConnectionUIState.CONNECTING}
+            >
+              <Rocket className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />Transfer
+            </Button>
+            {!!files.length && (
+              <Button
+                variant="outline"
+                className="font-bold border-border hover:bg-secondary/50 transition-all ease-in-out duration-300 hover:scale-[1.02] w-full sm:w-auto h-11 sm:h-12 lg:h-14 px-6 sm:px-8 text-sm sm:text-base"
+                onClick={handleRemoveAllFiles}
+              >
+                <Trash className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />Remove All
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={toggleModal}>
-        <DialogContent className="sm:max-w-xl w-full bg-background text-foreground border-none p-4 sm:p-6">
+        <DialogContent className="sm:max-w-xl w-[95vw] bg-background text-foreground border-none p-3 sm:p-6 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-foreground">
               <span className="text-lg font-bold">
@@ -666,8 +672,8 @@ function TransferContent() {
           </DialogHeader>
           
           {/* Current connection status */}
-          <div className="bg-border rounded-md p-3 mb-4">
-            <h3 className="font-medium text-sm mb-1">Connection Status</h3>
+          <div className="bg-border rounded-md p-2 sm:p-3 mb-3 sm:mb-4">
+            <h3 className="font-medium text-xs sm:text-sm mb-1">Connection Status</h3>
             <div className="flex justify-between items-center">
               <div>{renderConnectionStatus()}</div>
               <Button 
@@ -688,7 +694,7 @@ function TransferContent() {
             )}
           </div>
           
-          <div className="flex flex-col space-y-4 mt-4">
+          <div className="flex flex-col space-y-3 sm:space-y-4 mt-3 sm:mt-4">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <input
                 type="text"

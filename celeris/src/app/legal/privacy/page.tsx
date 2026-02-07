@@ -49,21 +49,21 @@ export default function PrivacyPolicy() {
     <div className="relative w-full min-h-screen bg-background text-foreground">
 
       {/* Header Section */}
-      <section className="container mx-auto px-6 pt-32 pb-16 max-w-4xl">
-        <div ref={headerRef} className="text-center mb-16">
-          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground/60 mb-4 font-medium">
+      <section className="container mx-auto px-4 sm:px-6 pt-20 sm:pt-32 pb-12 sm:pb-16 max-w-4xl">
+        <div ref={headerRef} className="text-center mb-12 sm:mb-16">
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground/60 mb-3 sm:mb-4 font-medium">
             Legal
           </p>
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
+          <h1 className="text-2xl sm:text-4xl md:text-6xl font-bold tracking-tight mb-4 sm:mb-6">
             Privacy <span className="text-primary">Policy</span>
           </h1>
-          <p className="text-muted-foreground text-lg">
+          <p className="text-muted-foreground text-xs sm:text-base md:text-lg">
             Last updated: February 6, 2026
           </p>
         </div>
 
         {/* Introduction */}
-        <div className="mb-16 p-8 rounded-2xl bg-card border border-border">
+        <div className="mb-12 sm:mb-16 p-4 sm:p-8 rounded-xl sm:rounded-2xl bg-card border border-border">
           <p className="text-muted-foreground leading-relaxed">
             At Celeris, we take your privacy seriously. This Privacy Policy explains how we handle your data 
             when you use our peer-to-peer file transfer service. Since Celeris operates on a direct 
@@ -75,15 +75,15 @@ export default function PrivacyPolicy() {
         <div ref={sectionsRef} className="space-y-8">
           {/* Section 1 */}
           <div data-section className="group">
-            <div className="flex items-start gap-4 p-8 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
-              <div className="w-10 h-10 flex items-center justify-center text-primary flex-shrink-0 mt-1">
-                <Database size={24} strokeWidth={1.5} />
+            <div className="flex items-start gap-3 sm:gap-4 p-4 sm:p-8 rounded-xl sm:rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
+              <div className="w-8 sm:w-10 h-8 sm:h-10 flex items-center justify-center text-primary flex-shrink-0 mt-0.5 sm:mt-1">
+                <Database size={20} strokeWidth={1.5} />
               </div>
               <div className="flex-1">
-                <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
+                <h2 className="text-lg sm:text-2xl font-semibold mb-3 sm:mb-4 group-hover:text-primary transition-colors duration-300">
                   Data We Collect
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>
                     Celeris uses peer-to-peer (P2P) technology, meaning your files are transferred directly 
                     between devices without being stored on our servers. However, to facilitate connections, 
@@ -122,7 +122,7 @@ export default function PrivacyPolicy() {
                 <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
                   How We Use Your Data
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>
                     Your data is used exclusively to facilitate peer-to-peer file transfers. Specifically:
                   </p>
@@ -162,7 +162,7 @@ export default function PrivacyPolicy() {
                 <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
                   Data Security
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>
                     We implement industry-standard security measures to protect your data:
                   </p>
@@ -199,7 +199,7 @@ export default function PrivacyPolicy() {
                 <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
                   Data Sharing & Third Parties
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>
                     We do not sell, trade, or rent your personal information to third parties. Limited data 
                     may be shared only in these circumstances:
@@ -233,7 +233,7 @@ export default function PrivacyPolicy() {
                 <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
                   Your Rights
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>You have the following rights regarding your data:</p>
                   <ul className="space-y-2 ml-6">
                     <li className="flex items-start gap-2">
@@ -268,7 +268,7 @@ export default function PrivacyPolicy() {
                 <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
                   International Data Transfers
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>
                     Celeris is accessible globally. When you use our service, your connection data may be 
                     processed through our signaling servers. We ensure appropriate safeguards are in place 
@@ -289,7 +289,7 @@ export default function PrivacyPolicy() {
                 <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
                   Cookies & Tracking
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>
                     Celeris uses minimal tracking technologies:
                   </p>
@@ -322,7 +322,7 @@ export default function PrivacyPolicy() {
                 <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
                   Changes to This Policy
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>
                     We may update this Privacy Policy from time to time. Any changes will be posted on this 
                     page with an updated "Last updated" date. We encourage you to review this policy 

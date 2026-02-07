@@ -4,20 +4,24 @@
 import React, { useEffect, useState, useRef } from "react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { BentoCard, BentoGrid } from "@/components/ui/bento-grid";
-import BlurFade from "@/components/ui/blur-fade";
-import Testimonials from "../components/CustomComponents/testimonials";
+import dynamic from "next/dynamic";
 import AnimatedBeam_Test from "../components/CustomComponents/fileTransferBeam";
 import { Rocket, Infinity, LockKeyhole, Globe, HandHeart, Github, Linkedin, Twitter, ChevronDown } from 'lucide-react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import "./index.css";
-import { VelocityScroll } from "@/components/ui/scroll-based-velocity";
-import Header from "@/components/CustomComponents/header";
 import Footer from "@/components/CustomComponents/footer";
-import Threads from "@/components/ui/react-bits/threads";
 
-gsap.registerPlugin(ScrollTrigger);
+// Dynamically import heavy animation components to avoid SSR/compilation issues
+const Threads = dynamic(() => import("@/components/ui/react-bits/threads"), {
+  ssr: false,
+  loading: () => null
+});
+
+const VelocityScroll = dynamic(() => import("@/components/ui/scroll-based-velocity").then(mod => ({ default: mod.VelocityScroll })), {
+  ssr: false,
+  loading: () => null
+});
 
 // Stable color reference for Threads component to prevent re-renders
 const THREADS_COLOR: [number, number, number] = [251/255, 146/255, 60/255];
@@ -116,6 +120,9 @@ export default function HomePage() {
   const faqRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
+    // Register GSAP plugin
+    gsap.registerPlugin(ScrollTrigger);
+
     let timeoutId: NodeJS.Timeout;
     const handleMouseMove = (e: MouseEvent) => {
       if (timeoutId) clearTimeout(timeoutId);
@@ -306,7 +313,7 @@ export default function HomePage() {
   return (
     <div className="relative w-full flex flex-col bg-background text-foreground overflow-x-hidden">
       {/* Hero Section */}
-      <section className="relative min-h-screen flex flex-col justify-center items-center w-full mx-auto px-6 py-32 mt-16">
+      <section className="relative min-h-screen flex flex-col justify-between items-center w-full mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-4 sm:pt-24 sm:pb-8 lg:pt-32 lg:pb-12">
         {/* Threads Background */}
         <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none opacity-30">
           <Threads
@@ -316,64 +323,67 @@ export default function HomePage() {
             enableMouseInteraction
           />
         </div>
-        
-        {/* Hero Text */}
-        <div className="text-center mb-16 relative z-10">
-          <h2 ref={titleRef} className="text-4xl md:text-7xl font-bold tracking-tighter leading-[1.1] mb-6">
-            <div className="overflow-hidden">
-              <span className="block">Seamless Transfer.</span>
-            </div>
-            <div className="overflow-hidden">
-              <span className="block text-primary">Uncompromised Speed.</span>
-            </div>
-          </h2>
-          <p ref={descRef} className="text-muted-foreground text-md font-light tracking-wide">
-            Secure peer-to-peer sharing architecture for the modern web.
-          </p>
+
+        {/* Content Container - Centered */}
+        <div className="flex-1 flex flex-col justify-center items-center w-full max-w-2xl lg:max-w-5xl xl:max-w-6xl relative z-10">
+          {/* Hero Text */}
+          <div className="text-center mb-6 sm:mb-10 lg:mb-12">
+            <h2 ref={titleRef} className="text-2xl sm:text-4xl md:text-6xl lg:text-6xl xl:text-7xl font-bold tracking-tighter leading-[1.1] mb-3 sm:mb-4 lg:mb-6">
+              <div className="overflow-hidden">
+                <span className="block">Seamless Transfer.</span>
+              </div>
+              <div className="overflow-hidden">
+                <span className="block text-primary">Uncompromised Speed.</span>
+              </div>
+            </h2>
+            <p ref={descRef} className="text-muted-foreground text-xs sm:text-md lg:text-lg font-light tracking-wide px-4 lg:px-0">
+              Secure peer-to-peer sharing architecture for the modern web.
+            </p>
+          </div>
+
+          {/* Interactive Cards */}
+          <div ref={cardsRef} className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 lg:gap-6 w-full lg:max-w-4xl">
+            {/* Send Card */}
+            <Link href="/share/transfer">
+              <button className="group relative flex flex-col justify-between items-start h-36 sm:h-44 lg:h-52 w-full p-5 sm:p-7 lg:p-9 rounded-xl sm:rounded-2xl bg-card border border-border hover:bg-accent hover:border-border/80 hover:scale-[1.01] transition-all ease-in-out duration-500">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-full bg-secondary border border-border flex items-center justify-center group-hover:border-primary/50 group-hover:text-primary transition-colors duration-300">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
+                </div>
+                <div className="text-left">
+                  <span className="block text-xl sm:text-2xl lg:text-2xl font-medium text-foreground mb-0.5 sm:mb-1 lg:mb-2">Send</span>
+                  <span className="text-xs sm:text-sm lg:text-sm text-muted-foreground group-hover:text-foreground/70 transition-colors">Drag & drop or browse</span>
+                </div>
+              </button>
+            </Link>
+
+            {/* Receive Card */}
+            <Link href="/share/receive">
+              <button className="group relative flex flex-col justify-between items-start h-36 sm:h-44 lg:h-52 w-full p-5 sm:p-7 lg:p-9 rounded-xl sm:rounded-2xl bg-card border border-border hover:bg-accent hover:border-border/80 hover:scale-[1.01] transition-all ease-in-out duration-500">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-full bg-secondary border border-border flex items-center justify-center group-hover:border-primary/50 group-hover:text-primary transition-colors duration-300">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+                </div>
+                <div className="text-left">
+                  <span className="block text-xl sm:text-2xl lg:text-2xl font-medium text-foreground mb-0.5 sm:mb-1 lg:mb-2">Receive</span>
+                  <span className="text-xs sm:text-sm lg:text-sm text-muted-foreground group-hover:text-foreground/70 transition-colors">Enter 10-digit key</span>
+                </div>
+              </button>
+            </Link>
+          </div>
         </div>
 
-        {/* Interactive Cards */}
-        <div ref={cardsRef} className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl mb-20 relative z-10">
-          {/* Send Card */}
-          <Link href="/share/transfer">
-            <button className="group relative flex flex-col justify-between items-start h-48 w-full p-8 rounded-2xl bg-card border border-border hover:bg-accent hover:border-border/80 hover:scale-[1.01] transition-all ease-in-out duration-500">
-              <div className="w-10 h-10 rounded-full bg-secondary border border-border flex items-center justify-center group-hover:border-primary/50 group-hover:text-primary transition-colors duration-300">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
-              </div>
-              <div className="text-left">
-                <span className="block text-2xl font-medium text-foreground mb-1">Send</span>
-                <span className="text-sm text-muted-foreground group-hover:text-foreground/70 transition-colors">Drag & drop or browse</span>
-              </div>
-            </button>
-          </Link>
-
-          {/* Receive Card */}
-          <Link href="/share/receive">
-            <button className="group relative flex flex-col justify-between items-start h-48 w-full p-8 rounded-2xl bg-card border border-border hover:bg-accent hover:border-border/80 hover:scale-[1.01] transition-all ease-in-out duration-500 ">
-              <div className="w-10 h-10 rounded-full bg-secondary border border-border flex items-center justify-center group-hover:border-primary/50 group-hover:text-primary transition-colors duration-300">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
-              </div>
-              <div className="text-left">
-                <span className="block text-2xl font-medium text-foreground mb-1">Receive</span>
-                <span className="text-sm text-muted-foreground group-hover:text-foreground/70 transition-colors">Enter 10-digit key</span>
-              </div>
-            </button>
-          </Link>
-        </div>
-
-        {/* Footer Stats */}
-        <footer ref={footerRef} className="relative z-10 w-full py-8 border-t border-border flex justify-center gap-16 md:gap-32 mt-auto">
+        {/* Footer Stats - Sticky to Bottom */}
+        <footer ref={footerRef} className="relative z-10 w-full py-4 sm:py-6 lg:py-8 border-t border-border flex justify-center gap-6 sm:gap-12 md:gap-24 lg:gap-32 mt-6 sm:mt-8 lg:mt-12">
           <div className="text-center">
-            <div className="text-xs text-muted-foreground uppercase tracking-widest mb-1">Encryption</div>
-            <div className="font-mono text-foreground">AES-256</div>
+            <div className="text-xs text-muted-foreground uppercase tracking-widest mb-1 text-[10px] sm:text-xs lg:text-sm">Encryption</div>
+            <div className="font-mono text-foreground text-xs sm:text-sm lg:text-base">AES-256</div>
           </div>
           <div className="text-center">
-            <div className="text-xs text-muted-foreground uppercase tracking-widest mb-1">Mode</div>
-            <div className="font-mono text-foreground">P2P</div>
+            <div className="text-xs text-muted-foreground uppercase tracking-widest mb-1 text-[10px] sm:text-xs lg:text-sm">Mode</div>
+            <div className="font-mono text-foreground text-xs sm:text-sm lg:text-base">P2P</div>
           </div>
           <div className="text-center">
-            <div className="text-xs text-muted-foreground uppercase tracking-widest mb-1">Limit</div>
-            <div className="font-mono text-foreground">NONE</div>
+            <div className="text-xs text-muted-foreground uppercase tracking-widest mb-1 text-[10px] sm:text-xs lg:text-sm">Limit</div>
+            <div className="font-mono text-foreground text-xs sm:text-sm lg:text-base">NONE</div>
           </div>
         </footer>
       </section>
@@ -390,15 +400,15 @@ export default function HomePage() {
       </div>
 
       {/* About Section */}
-      <section ref={whatIsCelerisRef} className="relative z-10 w-full pt-32 px-6">
+      <section ref={whatIsCelerisRef} className="relative z-10 w-full pt-16 sm:pt-32 px-4 sm:px-6">
         <div className="flex flex-col items-center justify-center max-w-4xl mx-auto text-center">
-          <p data-about-label className="text-xs uppercase tracking-[0.3em] text-muted-foreground/60 mb-4 font-medium">
+          <p data-about-label className="text-xs uppercase tracking-[0.3em] text-muted-foreground/60 mb-3 sm:mb-4 font-medium">
             About
           </p>
-          <h2 data-about-title className="text-4xl md:text-5xl font-bold tracking-tight mb-8">
+          <h2 data-about-title className="text-2xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-6 sm:mb-8">
             What is <span className="text-primary">Celeris</span>?
           </h2>
-          <p data-about-desc className="text-md md:text-lg text-muted-foreground leading-relaxed mb-12 max-w-3xl text-justify">
+          <p data-about-desc className="text-sm sm:text-md md:text-lg text-muted-foreground leading-relaxed mb-8 sm:mb-12 max-w-3xl text-justify">
             Celeris is a cutting-edge P2P file transfer application designed to simplify and secure the way you share files. Unlike traditional methods that rely on cloud storage, Celeris enables direct device-to-device transfers, ensuring your data is never stored on any server. With fast speeds, robust encryption, and a user-friendly interface, Celeris is the ideal solution for personal and professional file sharing needs.
           </p>
           <div data-about-beam className="flex flex-row justify-center">
@@ -408,15 +418,15 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section ref={featuresRef} className="container mx-auto px-6 py-32 z-10 relative">
-        <div className="flex flex-col items-center mb-10">
-          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground/60 mb-4 font-medium">
+      <section ref={featuresRef} className="container mx-auto px-4 sm:px-6 py-16 sm:py-32 z-10 relative">
+        <div className="flex flex-col items-center mb-8 sm:mb-10">
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground/60 mb-3 sm:mb-4 font-medium">
             Features
           </p>
-          <h2 className="text-4xl md:text-5xl font-semibold text-center mb-2">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-semibold text-center mb-2">
             Engineered for <span className="text-primary">Velocity</span>
           </h2>
-          <p className="text-md md:text-lg max-w-3xl text-center text-muted-foreground font-light leading-relaxed">
+          <p className="text-sm sm:text-md md:text-lg max-w-3xl text-center text-muted-foreground font-light leading-relaxed px-2">
             Experience the next generation of peer-to-peer file sharing. 
             Limitless, serverless, and uncompromisingly secure.
           </p>
@@ -433,10 +443,10 @@ export default function HomePage() {
                 style={{ transitionDelay: `${index * 100}ms` }}
               >
                 <div className="flex flex-col h-full">
-                  <div className="w-10 h-10 flex items-center justify-center text-foreground/70 mb-6 group-hover:text-primary transition-all duration-500 group-hover:scale-110 group-hover:rotate-3">
-                    <IconComponent size={24} strokeWidth={1.5} />
+                  <div className="w-8 sm:w-10 h-8 sm:h-10 flex items-center justify-center text-foreground/70 mb-4 sm:mb-6 group-hover:text-primary transition-all duration-500 group-hover:scale-110 group-hover:rotate-3">
+                    <IconComponent size={20} strokeWidth={1.5} />
                   </div>
-                  <h3 className="text-base font-medium mb-3 tracking-tight group-hover:translate-x-1 transition-transform duration-300">
+                  <h3 className="text-sm sm:text-base font-medium mb-2 sm:mb-3 tracking-tight group-hover:translate-x-1 transition-transform duration-300">
                     {feature.name}
                   </h3>
                   <p className="text-muted-foreground/70 text-sm leading-relaxed font-light group-hover:text-muted-foreground transition-colors duration-300">
@@ -452,15 +462,15 @@ export default function HomePage() {
       </section>
 
       {/* FAQ Section */}
-      <section ref={faqRef} className="container mx-auto px-6 py-32 z-10 relative">
-        <div className="flex flex-col items-center mb-16">
-          <p data-faq-label className="text-xs uppercase tracking-[0.3em] text-muted-foreground/60 mb-4 font-medium">
+      <section ref={faqRef} className="container mx-auto px-4 sm:px-6 py-16 sm:py-32 z-10 relative">
+        <div className="flex flex-col items-center mb-12 sm:mb-16">
+          <p data-faq-label className="text-xs uppercase tracking-[0.3em] text-muted-foreground/60 mb-3 sm:mb-4 font-medium">
             FAQ
           </p>
-          <h2 data-faq-title className="text-4xl md:text-5xl text-center font-bold tracking-tight mb-4">
+          <h2 data-faq-title className="text-2xl sm:text-4xl md:text-5xl text-center font-bold tracking-tight mb-3 sm:mb-4">
             Frequently Asked <span className="text-primary">Questions</span>
           </h2>
-          <p data-faq-desc className="text-md md:text-lg text-muted-foreground leading-relaxed max-w-2xl text-center">
+          <p data-faq-desc className="text-sm sm:text-md md:text-lg text-muted-foreground leading-relaxed max-w-2xl text-center px-2">
             Everything you need to know about Celeris and how it works.
           </p>
         </div>
@@ -474,9 +484,9 @@ export default function HomePage() {
             >
               <button
                 onClick={() => setOpenFaqIndex(openFaqIndex === index ? null : index)}
-                className="w-full flex items-center justify-between p-6 text-left transition-all duration-300"
+                className="w-full flex items-center justify-between p-4 sm:p-6 text-left transition-all duration-300"
               >
-                <h3 className="text-base md:text-lg font-medium pr-8 group-hover:text-primary transition-colors duration-300">
+                <h3 className="text-sm sm:text-base md:text-lg font-medium pr-6 sm:pr-8 group-hover:text-primary transition-colors duration-300">
                   {faq.question}
                 </h3>
                 <ChevronDown

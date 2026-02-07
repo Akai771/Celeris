@@ -48,21 +48,21 @@ export default function TermsAndConditions() {
   return (
     <div className="relative w-full min-h-screen bg-background text-foreground">
       {/* Header Section */}
-      <section className="container mx-auto px-6 pt-32 pb-16 max-w-4xl">
-        <div ref={headerRef} className="text-center mb-16">
-          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground/60 mb-4 font-medium">
+      <section className="container mx-auto px-4 sm:px-6 pt-20 sm:pt-32 pb-12 sm:pb-16 max-w-4xl">
+        <div ref={headerRef} className="text-center mb-12 sm:mb-16">
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground/60 mb-3 sm:mb-4 font-medium">
             Legal
           </p>
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
+          <h1 className="text-2xl sm:text-4xl md:text-6xl font-bold tracking-tight mb-4 sm:mb-6">
             Terms & <span className="text-primary">Conditions</span>
           </h1>
-          <p className="text-muted-foreground text-lg">
+          <p className="text-muted-foreground text-xs sm:text-base md:text-lg">
             Last updated: February 6, 2026
           </p>
         </div>
 
         {/* Introduction */}
-        <div className="mb-16 p-8 rounded-2xl bg-card border border-border">
+        <div className="mb-12 sm:mb-16 p-4 sm:p-8 rounded-xl sm:rounded-2xl bg-card border border-border">
           <p className="text-muted-foreground leading-relaxed">
             Welcome to Celeris. By accessing or using our peer-to-peer file transfer service, you agree to be 
             bound by these Terms and Conditions. Please read them carefully before using our service. If you 
@@ -74,15 +74,15 @@ export default function TermsAndConditions() {
         <div ref={sectionsRef} className="space-y-8">
           {/* Section 1 */}
           <div data-section className="group">
-            <div className="flex items-start gap-4 p-8 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
-              <div className="w-10 h-10 flex items-center justify-center text-primary flex-shrink-0 mt-1">
-                <FileText size={24} strokeWidth={1.5} />
+            <div className="flex items-start gap-3 sm:gap-4 p-4 sm:p-8 rounded-xl sm:rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
+              <div className="w-8 sm:w-10 h-8 sm:h-10 flex items-center justify-center text-primary flex-shrink-0 mt-0.5 sm:mt-1">
+                <FileText size={20} strokeWidth={1.5} />
               </div>
               <div className="flex-1">
-                <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
+                <h2 className="text-lg sm:text-2xl font-semibold mb-3 sm:mb-4 group-hover:text-primary transition-colors duration-300">
                   Service Description
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>
                     Celeris provides a peer-to-peer (P2P) file transfer platform that enables direct 
                     device-to-device file sharing. Key aspects of our service:
@@ -112,15 +112,15 @@ export default function TermsAndConditions() {
 
           {/* Section 2 */}
           <div data-section className="group">
-            <div className="flex items-start gap-4 p-8 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
-              <div className="w-10 h-10 flex items-center justify-center text-primary flex-shrink-0 mt-1">
-                <Shield size={24} strokeWidth={1.5} />
+            <div className="flex items-start gap-3 sm:gap-4 p-4 sm:p-8 rounded-xl sm:rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
+              <div className="w-8 sm:w-10 h-8 sm:h-10 flex items-center justify-center text-primary flex-shrink-0 mt-0.5 sm:mt-1">
+                <Shield size={20} strokeWidth={1.5} />
               </div>
               <div className="flex-1">
                 <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
                   User Responsibilities
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>By using Celeris, you agree to:</p>
                   <ul className="space-y-2 ml-6">
                     <li className="flex items-start gap-2">
@@ -155,15 +155,15 @@ export default function TermsAndConditions() {
 
           {/* Section 3 */}
           <div data-section className="group">
-            <div className="flex items-start gap-4 p-8 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
-              <div className="w-10 h-10 flex items-center justify-center text-primary flex-shrink-0 mt-1">
-                <Ban size={24} strokeWidth={1.5} />
+            <div className="flex items-start gap-3 sm:gap-4 p-4 sm:p-8 rounded-xl sm:rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
+              <div className="w-8 sm:w-10 h-8 sm:h-10 flex items-center justify-center text-primary flex-shrink-0 mt-0.5 sm:mt-1">
+                <Ban size={20} strokeWidth={1.5} />
               </div>
               <div className="flex-1">
                 <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
                   Prohibited Activities
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>The following activities are strictly prohibited:</p>
                   <ul className="space-y-2 ml-6">
                     <li className="flex items-start gap-2">
@@ -202,15 +202,15 @@ export default function TermsAndConditions() {
 
           {/* Section 4 */}
           <div data-section className="group">
-            <div className="flex items-start gap-4 p-8 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
-              <div className="w-10 h-10 flex items-center justify-center text-primary flex-shrink-0 mt-1">
-                <AlertCircle size={24} strokeWidth={1.5} />
+            <div className="flex items-start gap-3 sm:gap-4 p-4 sm:p-8 rounded-xl sm:rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
+              <div className="w-8 sm:w-10 h-8 sm:h-10 flex items-center justify-center text-primary flex-shrink-0 mt-0.5 sm:mt-1">
+                <AlertCircle size={20} strokeWidth={1.5} />
               </div>
               <div className="flex-1">
                 <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
                   Disclaimer of Warranties
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>
                     <strong className="text-foreground">Celeris is provided "AS IS" and "AS AVAILABLE"</strong> without 
                     warranties of any kind, either express or implied. We make no guarantees regarding:
@@ -244,15 +244,15 @@ export default function TermsAndConditions() {
 
           {/* Section 5 */}
           <div data-section className="group">
-            <div className="flex items-start gap-4 p-8 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
-              <div className="w-10 h-10 flex items-center justify-center text-primary flex-shrink-0 mt-1">
-                <Scale size={24} strokeWidth={1.5} />
+            <div className="flex items-start gap-3 sm:gap-4 p-4 sm:p-8 rounded-xl sm:rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
+              <div className="w-8 sm:w-10 h-8 sm:h-10 flex items-center justify-center text-primary flex-shrink-0 mt-0.5 sm:mt-1">
+                <Scale size={20} strokeWidth={1.5} />
               </div>
               <div className="flex-1">
                 <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
                   Limitation of Liability
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>
                     To the maximum extent permitted by law, Celeris and its operators shall not be liable for:
                   </p>
@@ -297,15 +297,15 @@ export default function TermsAndConditions() {
 
           {/* Section 6 */}
           <div data-section className="group">
-            <div className="flex items-start gap-4 p-8 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
-              <div className="w-10 h-10 flex items-center justify-center text-primary flex-shrink-0 mt-1">
-                <Zap size={24} strokeWidth={1.5} />
+            <div className="flex items-start gap-3 sm:gap-4 p-4 sm:p-8 rounded-xl sm:rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
+              <div className="w-8 sm:w-10 h-8 sm:h-10 flex items-center justify-center text-primary flex-shrink-0 mt-0.5 sm:mt-1">
+                <Zap size={20} strokeWidth={1.5} />
               </div>
               <div className="flex-1">
                 <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
                   Service Availability
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>
                     We strive to maintain high availability but make no guarantees:
                   </p>
@@ -334,15 +334,15 @@ export default function TermsAndConditions() {
 
           {/* Section 7 */}
           <div data-section className="group">
-            <div className="flex items-start gap-4 p-8 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
-              <div className="w-10 h-10 flex items-center justify-center text-primary flex-shrink-0 mt-1">
-                <Shield size={24} strokeWidth={1.5} />
+            <div className="flex items-start gap-3 sm:gap-4 p-4 sm:p-8 rounded-xl sm:rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
+              <div className="w-8 sm:w-10 h-8 sm:h-10 flex items-center justify-center text-primary flex-shrink-0 mt-0.5 sm:mt-1">
+                <Shield size={20} strokeWidth={1.5} />
               </div>
               <div className="flex-1">
                 <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
                   Indemnification
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>
                     You agree to indemnify and hold harmless Celeris, its operators, and affiliates from any 
                     claims, damages, losses, or expenses arising from:
@@ -372,15 +372,15 @@ export default function TermsAndConditions() {
 
           {/* Section 8 */}
           <div data-section className="group">
-            <div className="flex items-start gap-4 p-8 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
-              <div className="w-10 h-10 flex items-center justify-center text-primary flex-shrink-0 mt-1">
-                <FileText size={24} strokeWidth={1.5} />
+            <div className="flex items-start gap-3 sm:gap-4 p-4 sm:p-8 rounded-xl sm:rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
+              <div className="w-8 sm:w-10 h-8 sm:h-10 flex items-center justify-center text-primary flex-shrink-0 mt-0.5 sm:mt-1">
+                <FileText size={20} strokeWidth={1.5} />
               </div>
               <div className="flex-1">
-                <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
+                <h2 className="text-lg sm:text-2xl font-semibold mb-3 sm:mb-4 group-hover:text-primary transition-colors duration-300">
                   Termination
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>
                     We reserve the right to:
                   </p>
@@ -409,15 +409,15 @@ export default function TermsAndConditions() {
 
           {/* Section 9 */}
           <div data-section className="group">
-            <div className="flex items-start gap-4 p-8 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
-              <div className="w-10 h-10 flex items-center justify-center text-primary flex-shrink-0 mt-1">
-                <Scale size={24} strokeWidth={1.5} />
+            <div className="flex items-start gap-3 sm:gap-4 p-4 sm:p-8 rounded-xl sm:rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
+              <div className="w-8 sm:w-10 h-8 sm:h-10 flex items-center justify-center text-primary flex-shrink-0 mt-0.5 sm:mt-1">
+                <Scale size={20} strokeWidth={1.5} />
               </div>
               <div className="flex-1">
                 <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
                   Governing Law
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>
                     These Terms and Conditions shall be governed by and construed in accordance with applicable 
                     laws. Any disputes arising from these terms or your use of Celeris shall be resolved through 
@@ -430,15 +430,15 @@ export default function TermsAndConditions() {
 
           {/* Section 10 */}
           <div data-section className="group">
-            <div className="flex items-start gap-4 p-8 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
-              <div className="w-10 h-10 flex items-center justify-center text-primary flex-shrink-0 mt-1">
-                <FileText size={24} strokeWidth={1.5} />
+            <div className="flex items-start gap-3 sm:gap-4 p-4 sm:p-8 rounded-xl sm:rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
+              <div className="w-8 sm:w-10 h-8 sm:h-10 flex items-center justify-center text-primary flex-shrink-0 mt-0.5 sm:mt-1">
+                <FileText size={20} strokeWidth={1.5} />
               </div>
               <div className="flex-1">
-                <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
+                <h2 className="text-lg sm:text-2xl font-semibold mb-3 sm:mb-4 group-hover:text-primary transition-colors duration-300">
                   Changes to Terms
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>
                     We may update these Terms and Conditions from time to time. Changes will be posted on this 
                     page with an updated "Last updated" date. Your continued use of Celeris after changes are 
@@ -454,15 +454,15 @@ export default function TermsAndConditions() {
 
           {/* Section 11 */}
           <div data-section className="group">
-            <div className="flex items-start gap-4 p-8 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
-              <div className="w-10 h-10 flex items-center justify-center text-primary flex-shrink-0 mt-1">
-                <Shield size={24} strokeWidth={1.5} />
+            <div className="flex items-start gap-3 sm:gap-4 p-4 sm:p-8 rounded-xl sm:rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-300">
+              <div className="w-8 sm:w-10 h-8 sm:h-10 flex items-center justify-center text-primary flex-shrink-0 mt-0.5 sm:mt-1">
+                <Shield size={20} strokeWidth={1.5} />
               </div>
               <div className="flex-1">
                 <h2 className="text-2xl font-semibold mb-4 group-hover:text-primary transition-colors duration-300">
                   Severability
                 </h2>
-                <div className="space-y-4 text-muted-foreground leading-relaxed">
+                <div className="space-y-2 sm:space-y-4 text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
                   <p>
                     If any provision of these Terms and Conditions is found to be unenforceable or invalid, 
                     that provision shall be limited or eliminated to the minimum extent necessary so that these 
@@ -475,8 +475,8 @@ export default function TermsAndConditions() {
         </div>
 
         {/* Contact Section */}
-        <div className="mt-16 p-8 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
-          <h2 className="text-2xl font-semibold mb-4">Questions About These Terms?</h2>
+        <div className="mt-12 sm:mt-16 p-4 sm:p-8 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+          <h2 className="text-lg sm:text-2xl font-semibold mb-3 sm:mb-4">Questions About These Terms?</h2>
           <p className="text-muted-foreground leading-relaxed mb-6">
             If you have any questions about these Terms and Conditions, please contact us:
           </p>
@@ -496,8 +496,8 @@ export default function TermsAndConditions() {
         </div>
 
         {/* Acceptance Notice */}
-        <div className="mt-8 p-6 rounded-xl bg-muted/30 border border-border">
-          <p className="text-sm text-muted-foreground text-center">
+        <div className="mt-6 sm:mt-8 p-4 sm:p-6 rounded-lg sm:rounded-xl bg-muted/30 border border-border">
+          <p className="text-xs sm:text-sm text-muted-foreground text-center">
             By using Celeris, you acknowledge that you have read, understood, and agree to be bound by these Terms and Conditions.
           </p>
         </div>
