@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, Suspense, ChangeEvent } from "react";
+import React, { useState, useEffect, useRef, Suspense, ChangeEvent, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
 	Download,
@@ -12,6 +12,7 @@ import {
 	FileIcon,
 	LinkIcon,
 	Copy,
+	ScanLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import BlurFade from "@/components/ui/blur-fade";
@@ -86,6 +87,12 @@ function ReceiveContent() {
 	// Dialog state
 	const [isConnectDialogOpen, setConnectDialogOpen] = useState<boolean>(false);
 	const [isStatusDialogOpen, setStatusDialogOpen] = useState<boolean>(false);
+
+	// QR Scanner state
+	const [isScanning, setIsScanning] = useState<boolean>(false);
+	const [scannerError, setScannerError] = useState<string | null>(null);
+	const videoRef = useRef<HTMLVideoElement>(null);
+	const qrScannerRef = useRef<any>(null);
 
 	// Ref to prevent multiple connection attempts
 	const hasInitialized = useRef<boolean>(false);
@@ -239,7 +246,6 @@ function ReceiveContent() {
 				break;
 			case "connected":
 				setUIState(ConnectionUIState.CONNECTED);
-				setStatusDialogOpen(true);
 				setError(null); // Clear any previous errors
 
 				toast({
@@ -399,6 +405,87 @@ function ReceiveContent() {
 		router.push("/share/receive");
 	};
 
+	// QR Scanner functions
+	const stopScanner = useCallback(() => {
+		if (qrScannerRef.current) {
+			qrScannerRef.current.stop();
+			qrScannerRef.current.destroy();
+			qrScannerRef.current = null;
+		}
+		setIsScanning(false);
+		setScannerError(null);
+	}, []);
+
+	const startScanner = useCallback(async () => {
+		if (!videoRef.current) return;
+
+		setScannerError(null);
+
+		try {
+			const QrScanner = (await import("qr-scanner")).default;
+
+			const hasCamera = await QrScanner.hasCamera();
+			if (!hasCamera) {
+				setScannerError("No camera found on this device.");
+				return;
+			}
+
+			const scanner = new QrScanner(
+				videoRef.current,
+				(result: { data: string }) => {
+					const scannedData = result.data;
+					let extractedId = scannedData;
+
+					// Extract ID from URL if it's a link
+					if (scannedData.includes("?id=")) {
+						try {
+							const url = new URL(scannedData);
+							const id = url.searchParams.get("id");
+							if (id) extractedId = id;
+						} catch {}
+					}
+
+					if (extractedId.trim()) {
+						stopScanner();
+						setConnectionIdInput(extractedId);
+						setConnectDialogOpen(false);
+						handleConnect(extractedId);
+					}
+				},
+				{
+					returnDetailedScanResult: true,
+					highlightScanRegion: true,
+					highlightCodeOutline: true,
+				},
+			);
+
+			qrScannerRef.current = scanner;
+			await scanner.start();
+			setIsScanning(true);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			let userMessage = "Failed to start camera. Please check permissions.";
+
+			if (message.toLowerCase().includes("not found") || message.toLowerCase().includes("no camera")) {
+				userMessage = "No camera found. Make sure your device has a camera connected.";
+			} else if (message.toLowerCase().includes("permission") || message.toLowerCase().includes("not allowed") || message.toLowerCase().includes("denied")) {
+				userMessage = "Camera access denied. Please allow camera permissions and try again.";
+			} else if (message.toLowerCase().includes("secure") || message.toLowerCase().includes("https")) {
+				userMessage = "Camera requires a secure (HTTPS) connection.";
+			}
+
+			setScannerError(userMessage);
+			setIsScanning(false);
+		}
+	}, [stopScanner, handleConnect]);
+
+	// Cleanup scanner when dialog closes
+	useEffect(() => {
+		if (!isConnectDialogOpen) {
+			stopScanner();
+		}
+	}, [isConnectDialogOpen, stopScanner]);
+
 	// Render connection status indicator
 	const renderConnectionStatus = () => {
 		switch (uiState) {
@@ -466,16 +553,21 @@ function ReceiveContent() {
 
 					<div className="w-full flex flex-col items-center justify-center flex-1">
 						{/* Connection status indicator */}
-						<div className="flex w-full items-center justify-end gap-2 mb-3 sm:mb-4">
+						<div className="flex w-full items-center justify-between gap-2 mb-3 sm:mb-4">
+							{(uiState === ConnectionUIState.CONNECTED || uiState === ConnectionUIState.RECEIVING || uiState === ConnectionUIState.COMPLETE) && connectionId && (
+								<span className="font-bold text-muted-foreground text-xs sm:text-sm">
+									Connection ID: <span className="text-primary">{connectionId}</span>
+								</span>
+							)}
 							<Badge
-								className={`rounded-xl text-xs sm:text-sm backdrop-blur-sm transition-all duration-300 ${uiState === ConnectionUIState.ERROR || uiState === ConnectionUIState.IDLE ? "bg-red-500/10 border-red-500/50" : "bg-green-500/10 border-green-500/50"}`}>
+								className={`rounded-xl text-xs sm:text-sm backdrop-blur-sm transition-all duration-300 ${uiState === ConnectionUIState.ERROR || uiState === ConnectionUIState.IDLE ? "bg-red-500/10 border-red-500/50" : "bg-green-500/10 border-green-500/50"} ${!(uiState === ConnectionUIState.CONNECTED || uiState === ConnectionUIState.RECEIVING || uiState === ConnectionUIState.COMPLETE) || !connectionId ? 'ml-auto' : ''}`}>
 								<div
 									className={`w-2 h-2 rounded-full mr-2 ${uiState === ConnectionUIState.ERROR || uiState === ConnectionUIState.IDLE ? "bg-red-500" : "bg-green-500"} animate-pulse`}
 								/>
 								{renderConnectionStatus()}
 							</Badge>
 						</div>
-						<div className="relative flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 rounded-xl sm:rounded-2xl w-full h-[50vh] sm:h-[55vh] lg:flex-1 lg:max-h-[calc(100vh-28rem)] bg-card border border-border hover:border-border/80 transition-all duration-500 overflow-hidden">
+						<div className="relative flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 rounded-xl sm:rounded-2xl w-full h-[50vh] sm:h-[55vh] lg:flex-1 lg:max-h-70 bg-card border border-border hover:border-border/80 transition-all duration-500 overflow-hidden">
 							{receivedFiles.length > 0 ? (
 								<ScrollArea className="w-full h-[40dvh] sm:h-[50dvh] lg:h-full lg:max-h-[calc(100vh-30rem)]">
 									<Table className="w-full">
@@ -528,17 +620,12 @@ function ReceiveContent() {
 							) : (
 								<div className="flex flex-col items-center justify-center h-full">
 									{uiState === ConnectionUIState.IDLE ? (
-										<div className="text-center px-3 sm:px-4">
-											<FileIcon className="w-12 h-12 sm:w-14 md:w-16 lg:w-20 text-muted-foreground mx-auto mb-4 sm:mb-5 lg:mb-6" />
-											<p className="text-sm sm:text-base lg:text-lg text-muted-foreground mb-6 sm:mb-8 lg:mb-10 leading-relaxed">
-												No files received yet. Connect to start receiving files.
+										<div className="flex flex-col items-center justify-center gap-2 px-3 sm:px-4">
+											<FileIcon className="w-8 h-8 text-muted-foreground mx-auto" />
+											<p className="text-sm sm:text-base lg:text-lg font-light text-muted-foreground leading-relaxed">
+												No files received yet
 											</p>
-											<Button
-												className="font-bold bg-primary hover:bg-primary/80 transition-all ease-in-out duration-300 hover:scale-[1.02] w-full sm:w-auto h-11 sm:h-12 lg:h-14 px-6 sm:px-8 text-sm sm:text-base"
-												onClick={() => setConnectDialogOpen(true)}>
-												<LinkIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-												Enter Connection ID
-											</Button>
+											<span className="text-muted-foreground/60 text-xs sm:text-sm">Connect to start receiving files</span>
 										</div>
 									) : uiState === ConnectionUIState.JOINING ||
 									  uiState === ConnectionUIState.WAITING ? (
@@ -609,11 +696,10 @@ function ReceiveContent() {
 						uiState === ConnectionUIState.RECEIVING ||
 						uiState === ConnectionUIState.COMPLETE) && (
 						<Button
-							variant="outline"
-							className="font-bold border-border hover:bg-secondary/50 transition-all ease-in-out duration-300 hover:scale-[1.02] w-full sm:w-auto h-11 sm:h-12 lg:h-14 px-6 sm:px-8 text-sm sm:text-base"
+							variant="destructive"
+							className="font-bold border-border hover:bg-destructive/50 transition-all ease-in-out duration-300 hover:scale-[1.02] w-full sm:w-auto h-11 sm:h-12 lg:h-14 px-6 sm:px-8 text-sm sm:text-base"
 							onClick={startNewSession}>
-							<RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-							New Session
+							Disconnect
 						</Button>
 					)}
 
@@ -642,26 +728,81 @@ function ReceiveContent() {
 					</DialogHeader>
 
 					<div className="space-y-4 my-2">
-						<Input
-							placeholder="Connection ID or full link"
-							className="bg-muted/20 border-muted text-foreground focus-visible:ring-primary"
-							value={connectionIdInput}
-							onChange={(e: ChangeEvent<HTMLInputElement>) => {
-								const value = e.target.value;
-								// Extract ID if it's a URL
-								if (value.includes("?id=")) {
-									try {
-										const url = new URL(value);
-										const id = url.searchParams.get("id");
-										if (id) {
-											setConnectionIdInput(id);
-											return;
-										}
-									} catch {}
-								}
-								setConnectionIdInput(value);
-							}}
-						/>
+						<div className="flex items-center gap-2">
+							<Input
+								placeholder="Connection ID or full link"
+								className="bg-muted/20 border-muted text-foreground focus-visible:ring-primary flex-1"
+								value={connectionIdInput}
+								onChange={(e: ChangeEvent<HTMLInputElement>) => {
+									const value = e.target.value;
+									if (value.includes("?id=")) {
+										try {
+											const url = new URL(value);
+											const id = url.searchParams.get("id");
+											if (id) {
+												setConnectionIdInput(id);
+												return;
+											}
+										} catch {}
+									}
+									setConnectionIdInput(value);
+								}}
+							/>
+							<Button
+								variant="outline"
+								size="icon"
+								className={`h-10 w-10 shrink-0 transition-all duration-300 ${
+									isScanning
+										? "bg-primary text-white hover:bg-primary/80 border-primary"
+										: "hover:bg-primary/20 hover:border-primary"
+								}`}
+								onClick={() => isScanning ? stopScanner() : startScanner()}
+								title={isScanning ? "Stop scanner" : "Scan QR code"}
+							>
+								<ScanLine className="h-5 w-5" />
+							</Button>
+						</div>
+
+						{/* QR Scanner Video */}
+						<div className={`overflow-hidden rounded-lg transition-all duration-300 ${isScanning || scannerError ? "max-h-[350px] opacity-100" : "max-h-0 opacity-0"}`}>
+							{scannerError ? (
+								<div className="flex flex-col items-center justify-center gap-3 py-8 px-4 bg-muted/20 rounded-lg border border-red-500/20">
+									<div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
+										<AlertTriangle className="h-6 w-6 text-red-500" />
+									</div>
+									<p className="text-sm text-red-400 text-center">{scannerError}</p>
+									<Button
+										variant="outline"
+										size="sm"
+										className="mt-1 hover:bg-primary/20 hover:border-primary"
+										onClick={() => {
+											setScannerError(null);
+											startScanner();
+										}}
+									>
+										<RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+										Retry
+									</Button>
+								</div>
+							) : (
+								<>
+									<div className="relative aspect-square max-h-[280px] w-full bg-black rounded-lg overflow-hidden">
+										<video
+											ref={videoRef}
+											className="w-full h-full object-cover"
+										/>
+										{isScanning && (
+											<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+												<div className="w-48 h-48 border-2 border-primary/60 rounded-lg" />
+											</div>
+										)}
+									</div>
+									<p className="text-center text-xs text-muted-foreground mt-2">
+										Point your camera at a QR code
+									</p>
+								</>
+							)}
+						</div>
 					</div>
 
 					<DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-3">
@@ -676,53 +817,6 @@ function ReceiveContent() {
 							onClick={() => handleConnect()}
 							disabled={!connectionIdInput.trim()}>
 							Connect
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
-
-			{/* Connection status dialog */}
-			<Dialog open={isStatusDialogOpen} onOpenChange={setStatusDialogOpen}>
-				<DialogContent className="sm:max-w-xl w-[95vw] bg-background text-foreground border-none p-3 sm:p-6">
-					<DialogHeader>
-						<DialogTitle className="text-foreground">
-							<span className="text-lg font-bold">
-								Connection <span className="text-primary">Established</span>
-							</span>
-						</DialogTitle>
-						<DialogDescription className="text-muted-foreground text-sm mt-2">
-							You are now connected to the sender. Waiting for files...
-						</DialogDescription>
-					</DialogHeader>
-
-					<div className="bg-border rounded-md p-3 mb-4">
-						<h3 className="font-medium text-sm mb-2">Connection Info</h3>
-						<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-							<div className="text-xs sm:text-sm flex items-center gap-2 flex-wrap">
-								<span className="text-muted-foreground">ID:</span>
-								<code className="bg-foreground/20 px-2 py-1 rounded text-primary break-all">
-									{connectionId}
-								</code>
-								<button
-									className="text-muted-foreground hover:text-foreground"
-									onClick={() => navigator.clipboard.writeText(connectionId)}>
-									<Copy className="h-3 w-3" />
-								</button>
-							</div>
-							<div className="text-green-500 flex items-center text-sm">
-								<CheckCircle className="h-4 w-4 mr-1" />
-								Connected
-							</div>
-						</div>
-					</div>
-
-					<DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-3">
-						<Button
-							variant="destructive"
-							onClick={handleDisconnect}
-							className="w-full sm:w-auto h-10 sm:h-11 transition-all ease-in-out duration-300 hover:scale-[1.02]">
-							<X className="h-4 w-4 mr-2" />
-							Disconnect
 						</Button>
 					</DialogFooter>
 				</DialogContent>

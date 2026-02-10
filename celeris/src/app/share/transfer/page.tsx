@@ -20,6 +20,7 @@ import {
   RefreshCw,
   AlertTriangle,
   Trash,
+  Upload,
 } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
 import { BsTwitterX } from "react-icons/bs";
@@ -35,7 +36,6 @@ import { useWebRTC } from "@/hooks/useWebRTC";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 
-// Define connection states for UI feedback
 enum ConnectionUIState {
   IDLE = "idle",
   CREATING = "creating",
@@ -550,12 +550,15 @@ function TransferContent() {
 
             <div
               {...getRootProps()}
-              className="relative px-4 sm:px-6 lg:px-8 rounded-xl sm:rounded-2xl w-full h-[50vh] sm:h-[55vh] lg:flex-1 lg:max-h-[calc(100vh-28rem)] bg-card border border-border hover:border-border/80 transition-all duration-500 flex items-center justify-center cursor-pointer overflow-hidden group"
+              className="relative px-4 sm:px-6 lg:px-8 rounded-xl sm:rounded-2xl w-full h-[50vh] sm:h-[55vh] lg:flex-1 lg:max-h-70 bg-card border border-border hover:border-border/80 transition-all duration-500 flex items-center justify-center cursor-pointer overflow-hidden group"
             >
               <input {...getInputProps()} />
               {!files.length ? (
-                <div className="text-center px-4">
-                  <p className="text-muted-foreground text-sm sm:text-base lg:text-lg font-light mb-2">
+                <div className="flex flex-col items-center justify-center px-4 gap-1 sm:gap-2">
+                  <span>
+                    <Upload className="w-8 h-8 text-muted-foreground"/>
+                  </span>
+                  <p className="text-muted-foreground text-sm sm:text-base lg:text-lg font-light">
                     Drag &amp; drop files here
                   </p>
                   <p className="text-muted-foreground/60 text-xs sm:text-sm">
@@ -676,44 +679,98 @@ function TransferContent() {
           </div>
         </div>
       </div>
-
+      
+      {/* Transfer Connection Dialog */}
       <Dialog open={isModalOpen} onOpenChange={toggleModal}>
         <DialogContent className="sm:max-w-xl w-[95vw] bg-background text-foreground border-none p-3 sm:p-6 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-foreground">
-              <span className="text-lg font-bold">
-                Your link is <span className="text-primary">ready</span>
-              </span>
-            </DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-foreground">
+                <span className="text-lg font-bold">
+                  Your link is <span className="text-primary">ready</span>
+                </span>
+              </DialogTitle>
+              {/* Connection Status Badge */}
+              <div className="flex items-center gap-2 px-4">
+                <Badge 
+                  variant="outline" 
+                  className={`text-xs font-medium px-2 py-1 ${
+                    uiState === ConnectionUIState.ERROR || uiState === ConnectionUIState.IDLE 
+                      ? "bg-red-500/10 border-red-500/50 text-red-500" 
+                      : uiState === ConnectionUIState.CONNECTED || uiState === ConnectionUIState.COMPLETE
+                      ? "bg-green-500/10 border-green-500/50 text-green-500"
+                      : "bg-amber-500/10 border-amber-500/50 text-amber-500"
+                  }`}
+                >
+                  <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                    uiState === ConnectionUIState.ERROR || uiState === ConnectionUIState.IDLE 
+                      ? "bg-red-500" 
+                      : uiState === ConnectionUIState.CONNECTED || uiState === ConnectionUIState.COMPLETE
+                      ? "bg-green-500"
+                      : "bg-amber-500"
+                  } animate-pulse`}/>
+                  {uiState === ConnectionUIState.IDLE && "Idle"}
+                  {uiState === ConnectionUIState.CREATING && "Creating..."}
+                  {uiState === ConnectionUIState.READY && "Waiting"}
+                  {uiState === ConnectionUIState.CONNECTING && "Connecting..."}
+                  {uiState === ConnectionUIState.CONNECTED && "Connected"}
+                  {uiState === ConnectionUIState.TRANSFERRING && "Sending"}
+                  {uiState === ConnectionUIState.COMPLETE && "Complete"}
+                  {uiState === ConnectionUIState.ERROR && "Error"}
+                </Badge>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={resetConnection}
+                  className="h-7 w-7 p-0 hover:bg-primary/20"
+                  title="Reset connection"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
             <DialogDescription className="text-muted-foreground text-sm mt-2">
               Copy, scan, or share this link to start transferring files.
             </DialogDescription>
           </DialogHeader>
           
-          {/* Current connection status */}
-          <div className="bg-border rounded-md p-2 sm:p-3 mb-3 sm:mb-4">
-            <h3 className="font-medium text-xs sm:text-sm mb-1">Connection Status</h3>
-            <div className="flex justify-between items-center">
-              <div>{renderConnectionStatus()}</div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={resetConnection}
-                className="text-xs text-white transition-all ease-in-out duration-300 bg-primary hover:bg-primary/80 flex items-center"
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/50 rounded-md p-3 mb-3 text-sm text-red-400 flex items-start">
+              <AlertTriangle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+          
+          {/* Connection ID Display */}
+          <div className="bg-border/50 rounded-md p-3 mb-3">
+            <h3 className="font-medium text-xs text-muted-foreground mb-2">Connection ID</h3>
+            <div className=" flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <input
+                type="text"
+                className="flex-1 p-2 bg-background/50 text-foreground rounded text-sm font-mono"
+                value={connectionId}
+                readOnly
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                className="font-medium hover:bg-primary/20 whitespace-nowrap w-full sm:w-auto flex items-center gap-2"
+                onClick={() => {
+                  navigator.clipboard.writeText(connectionId);
+                  toast({
+                    title: "Connection ID Copied",
+                    description: "Connection ID copied to clipboard.",
+                  });
+                }}
               >
-                <RefreshCw className="mr-1 h-3 w-3" /> Reset
+                <Copy size={14} />
+                Copy ID
               </Button>
             </div>
-            
-            {error && (
-              <div className="text-sm text-red-400 flex items-start">
-                <AlertTriangle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
-                <span className="italic">{error}</span>
-              </div>
-            )}
           </div>
-          
-          <div className="flex flex-col space-y-3 sm:space-y-4 mt-3 sm:mt-4">
+          <div className="border-t border-border" />
+          <div className=" flex flex-col space-y-3 sm:space-y-4 mt-3 sm:mt-1">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <input
                 type="text"
@@ -765,28 +822,6 @@ function TransferContent() {
                 >
                   <FaWhatsapp size={25} />
                 </a>
-              </div>
-            </div>
-
-            <div className="border-t border-border pt-3 flex flex-col gap-2">
-              <label htmlFor="emailInput" className="text-foreground text-sm">
-                Send link via email:
-              </label>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  id="emailInput"
-                  type="email"
-                  placeholder="Recipient email"
-                  className="text-sm flex-1 p-2 rounded bg-border text-muted-foreground"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-                <Button
-                  className="font-bold hover:bg-primary/80 whitespace-nowrap text-white w-full sm:w-auto"
-                  onClick={sendEmail}
-                >
-                  Send Email
-                </Button>
               </div>
             </div>
             

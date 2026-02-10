@@ -45,3 +45,5 @@ signaling-server/DEPLOYMENT.md
 /signaling-server/node_modules
 signaling-server/DEPLOYMENT-APP-PLATFORM.md
 celeris/package-lock.json
+blackbook.txt
+celeris/package-lock.json

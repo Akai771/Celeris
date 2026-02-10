@@ -6,10 +6,11 @@
 
 body {
   font-family: 'Inter', sans-serif;
-  ::selection {
-    background-color: rgb(59, 130, 246, 0.3);
-    color:#FFF
-  }
+}
+
+::selection {
+  background-color: rgb(251, 146, 60);
+  color: #FFF;
 }
 
 
@@ -154,3 +155,4 @@ html:not(.dark) * {
 html:not(.dark) *::-webkit-scrollbar-track {
   background: #e5e7eb;
 }
+
