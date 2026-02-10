@@ -191,7 +191,6 @@ function TransferContent() {
   
   // Modal state
   const [isModalOpen, setModalOpen] = useState<boolean>(false);
-  const [email, setEmail] = useState<string>("");
   
   // Initialize WebRTC hook
   const { 
@@ -361,24 +360,6 @@ function TransferContent() {
       // Just close the modal if it's already open
       setModalOpen(false);
     }
-  };
-
-  // Send an email with the transfer link
-  const sendEmail = () => {
-    if (!email.trim()) {
-      toast({
-        variant: "destructive",
-        title: "No email specified",
-        description: "Please enter a recipient's email address.",
-      });
-      return;
-    }
-    toast({
-      variant: "default",
-      title: "Email sent",
-      description: `We've sent the transfer link to ${email}.`,
-    });
-    setEmail("");
   };
   
   // Handle sending a file
